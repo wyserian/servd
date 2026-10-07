@@ -1,8 +1,8 @@
 # servd
 
-[![CI](https://github.com/bitwyser/servd/actions/workflows/ci.yml/badge.svg)](https://github.com/bitwyser/servd/actions/workflows/ci.yml)
-[![Release](https://github.com/bitwyser/servd/actions/workflows/release.yml/badge.svg)](https://github.com/bitwyser/servd/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/bitwyser/servd?sort=semver&label=release)](https://github.com/bitwyser/servd/releases)
+[![CI](https://github.com/wyserian/servd/actions/workflows/ci.yml/badge.svg)](https://github.com/wyserian/servd/actions/workflows/ci.yml)
+[![Release](https://github.com/wyserian/servd/actions/workflows/release.yml/badge.svg)](https://github.com/wyserian/servd/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/wyserian/servd?sort=semver&label=release)](https://github.com/wyserian/servd/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-informational)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin&logoColor=white)
@@ -97,7 +97,7 @@ download dependencies; a packaged build - or one you've already built - runs wit
 
 ## Download
 
-Grab a prebuilt build from the [**latest release**](https://github.com/bitwyser/servd/releases/latest)
+Grab a prebuilt build from the [**latest release**](https://github.com/wyserian/servd/releases/latest)
 - no toolchain or build step needed:
 
 | Platform | Asset | Run it |
