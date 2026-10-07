@@ -47,6 +47,9 @@ class FileStore(private val dir: File) {
         return meta to file
     }
 
+    /** Every stored file (newest first) with its backing file - for "download all". */
+    fun entries(): List<Pair<FileMeta, File>> = list().mapNotNull { get(it.id) }
+
     /** Delete one file (bytes + metadata). Returns its metadata, or null if unknown. */
     fun remove(id: String): FileMeta? {
         val meta = metas.remove(id) ?: return null

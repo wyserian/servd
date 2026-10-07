@@ -34,6 +34,10 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondFile
+import io.ktor.server.response.respondOutputStream
+import java.util.zip.Deflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -204,6 +208,29 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             get("/files") {
                 call.respondText(json.encodeToString(fileStore.list()), ContentType.Application.Json)
             }
+            // Every shared file in one zip, streamed (nothing buffered in memory). Duplicate names
+            // get a " (2)" suffix so no entry overwrites another when extracted.
+            get("/files/zip") {
+                val entries = fileStore.entries()
+                if (entries.isEmpty()) return@get call.respond(HttpStatusCode.NotFound)
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    ContentDisposition.Attachment
+                        .withParameter(ContentDisposition.Parameters.FileName, "servd-files.zip")
+                        .toString(),
+                )
+                call.respondOutputStream(ContentType.Application.Zip) {
+                    ZipOutputStream(this).use { zip ->
+                        zip.setLevel(Deflater.BEST_SPEED)
+                        val used = HashSet<String>()
+                        for ((meta, file) in entries) {
+                            zip.putNextEntry(ZipEntry(uniqueName(meta.name, used)))
+                            file.inputStream().use { it.copyTo(zip) }
+                            zip.closeEntry()
+                        }
+                    }
+                }
+            }
             get("/files/{id}") {
                 val entry = call.parameters["id"]?.let { fileStore.get(it) }
                 if (entry == null) {
@@ -351,6 +378,18 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
         }
     }
+}
+
+/** [name], or "name (2).ext", "name (3).ext"… if already in [used]. Records the result in [used]. */
+private fun uniqueName(name: String, used: MutableSet<String>): String {
+    var candidate = name
+    var n = 2
+    while (!used.add(candidate.lowercase())) {
+        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+        candidate = name.substring(0, dot) + " ($n)" + name.substring(dot)
+        n++
+    }
+    return candidate
 }
 
 /** True only when the request came from this machine (loopback), gating the admin API. */

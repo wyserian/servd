@@ -113,6 +113,7 @@
   .center { display: flex; flex-direction: column; min-height: 0; }
   .tabs { display: flex; align-items: center; gap: 2px; padding: 8px 10px 4px; }
   .tab-spacer { flex: 1; }
+  #dlAllBtn { margin-right: 6px; }
   /* buttons: quiet secondary by default; one filled primary per section; red only for destructive */
   .mini-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--ink); background: var(--surface-2); border: 0; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background .15s, color .15s, filter .15s; }
   .mini-btn[hidden] { display: none; } /* the display rule above would otherwise override hidden */
@@ -362,6 +363,7 @@
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ftp" id="ftpTab" hidden><span class="tdot" id="ftpDot"></span>ftp</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ssh" id="sshTab" hidden><span class="tdot" id="sshDot"></span>ssh</button>
           <span class="tab-spacer"></span>
+          <button class="mini-btn" id="dlAllBtn" type="button" title="Download every shared file as one zip" disabled>download all</button>
           <button class="mini-btn btn-danger" id="clearBtn" type="button">clear files</button>
         </div>
 
@@ -598,6 +600,7 @@
     const ups=[...uploads.entries()];
     fbadge.style.display = items.length ? "" : "none"; fbadge.textContent=items.length;
     $("filesDot").classList.toggle("on", items.length>0);
+    $("dlAllBtn").disabled = !items.length; // nothing to download yet
     if(!items.length && !ups.length){ flist.innerHTML='<div class="files-empty">No files shared yet.</div>'; return; }
     flist.innerHTML="";
     for(const [id,u] of ups){
@@ -867,7 +870,14 @@
     if(tab.dataset.view==="sharing") showBrowsePane();
   }));
   function activeView(){ return document.querySelector('.tab[aria-selected="true"]').dataset.view; }
-  function updateClearBtn(){ const v=activeView(); $("clearBtn").style.display = (v==="files"||v==="chat") ? "" : "none"; $("clearBtn").textContent = v==="files" ? "clear files" : "clear chat"; }
+  function updateClearBtn(){ const v=activeView(); $("clearBtn").style.display = (v==="files"||v==="chat") ? "" : "none"; $("clearBtn").textContent = v==="files" ? "clear files" : "clear chat"; $("dlAllBtn").style.display = v==="files" ? "" : "none"; }
+  // Download all: the server streams one zip; the button acknowledges the click right away.
+  $("dlAllBtn").addEventListener("click",()=>{
+    const b=$("dlAllBtn"); if(b.disabled) return;
+    window.location.href="/files/zip";
+    b.textContent="downloading…"; b.disabled=true;
+    setTimeout(()=>{ b.textContent="download all"; b.disabled = !files.size; }, 1500);
+  });
   updateClearBtn(); // reflect the default tab (files) on load
   $("clearBtn").addEventListener("click",()=>{
     if(activeView()==="files"){
