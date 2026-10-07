@@ -7,8 +7,10 @@ import io.ktor.client.plugins.websocket.webSocket as clientWebSocket
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -23,6 +25,7 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.request.uri
 import io.ktor.server.response.respondBytesWriter
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.head
@@ -36,11 +39,17 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.copyTo
 import io.ktor.websocket.close
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.URI
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
 
 /**
@@ -63,6 +72,13 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     @Volatile private var server: EmbeddedServer<TEngine, TConfiguration>? = null
     @Volatile private var currentTarget: String? = null
     @Volatile private var currentPort: Int = 0
+
+    /**
+     * For a `localhost` target: the loopback origin that actually answered (`127.0.0.1` or
+     * `[::1]`). Dev servers like Vite bind `localhost` to IPv6 only, while the JVM resolves it to
+     * IPv4 first - so we probe both and cache the one that works. Cleared on any upstream failure.
+     */
+    @Volatile private var resolvedOrigin: String? = null
 
     val enabled: Boolean get() = server != null
 
@@ -118,6 +134,7 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         server = null
         currentTarget = null
         currentPort = 0
+        resolvedOrigin = null
     }
 
     private fun Application.proxyModule(target: String) {
@@ -139,15 +156,29 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     }
 
     private suspend fun proxyHttp(target: String, call: ApplicationCall) {
-        val url = target + call.request.uri
+        val url = upstreamOrigin(target) + call.request.uri
         val method = call.request.httpMethod
         val hasBody = method != HttpMethod.Get && method != HttpMethod.Head
-        val response = client.request(url) {
-            this.method = method
-            call.request.headers.forEach { name, values ->
-                if (!isRequestHopByHop(name)) values.forEach { headers.append(name, it) }
+        val response = try {
+            client.request(url) {
+                this.method = method
+                call.request.headers.forEach { name, values ->
+                    if (!isRequestHopByHop(name)) values.forEach { headers.append(name, it) }
+                }
+                headers[HttpHeaders.Host] = targetAuthority(target) // keep "localhost:5173", not the IP
+                if (hasBody) setBody(call.receiveChannel())
             }
-            if (hasBody) setBody(call.receiveChannel())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            resolvedOrigin = null // re-probe next time (the app may have restarted)
+            call.application.environment.log.warn("servd proxy: can't reach $target (${e.message})")
+            call.respondText(
+                "servd couldn't reach $target - is your app running?",
+                ContentType.Text.Plain,
+                HttpStatusCode.BadGateway,
+            )
+            return
         }
         response.headers.forEach { name, values ->
             if (!isResponseHopByHop(name)) values.forEach { value ->
@@ -163,9 +194,9 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         target: String,
         downstream: io.ktor.server.websocket.DefaultWebSocketServerSession,
     ) {
-        val wsUrl = toWsScheme(target) + downstream.call.request.uri
+        val wsUrl = toWsScheme(upstreamOrigin(target)) + downstream.call.request.uri
         try {
-            client.clientWebSocket(wsUrl) {
+            client.clientWebSocket(wsUrl, request = { headers[HttpHeaders.Host] = targetAuthority(target) }) {
                 val upstream = this
                 coroutineScope {
                     val scope = this
@@ -179,10 +210,42 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
+            resolvedOrigin = null
+            downstream.call.application.environment.log.warn("servd proxy: websocket to $target failed (${e.message})")
             runCatching { downstream.close() }
         }
     }
+
+    /**
+     * Where to actually connect for [target]. Non-localhost targets are used as-is. For `localhost`
+     * we probe `127.0.0.1` then `[::1]` (cached once one answers), since dev servers often listen
+     * on only one of them. Falls back to [target] if neither answers, so the error stays readable.
+     */
+    private suspend fun upstreamOrigin(target: String): String {
+        val uri = runCatching { URI(target) }.getOrNull() ?: return target
+        if (!uri.host.equals("localhost", ignoreCase = true)) return target
+        resolvedOrigin?.let { return it }
+        val port = if (uri.port > 0) uri.port else if (uri.scheme == "https") 443 else 80
+        val found = withContext(Dispatchers.IO) {
+            listOf("127.0.0.1" to "127.0.0.1", "::1" to "[::1]")
+                .firstOrNull { (ip, _) -> canConnect(ip, port) }
+                ?.let { (_, literal) -> "${uri.scheme}://$literal:$port" }
+        }
+        if (found != null) resolvedOrigin = found
+        return found ?: target
+    }
+
+    private fun canConnect(host: String, port: Int): Boolean = runCatching {
+        Socket().use { it.connect(InetSocketAddress(host, port), 400) }
+        true
+    }.getOrDefault(false)
+
+    /** "host:port" of the target as the user typed it - sent as the Host header upstream. */
+    private fun targetAuthority(target: String): String =
+        runCatching { URI(target).rawAuthority }.getOrNull() ?: target.substringAfter("://")
 
     /** Rewrite a redirect that points back at the target origin so the client stays on the proxy. */
     private fun rewriteLocation(name: String, value: String, target: String): String {
