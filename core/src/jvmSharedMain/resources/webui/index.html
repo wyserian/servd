@@ -55,13 +55,13 @@
   ::-webkit-scrollbar-track { background: transparent; }
 
   /* ---------- top bar ---------- */
-  .topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 7px 16px; box-shadow: var(--shadow-sm); }
+  .topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border-radius: var(--r); padding: 7px 16px; }
   .brand { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-weight: 600; font-size: 16px; letter-spacing: -.01em; }
   .brand .prompt { color: var(--accent); }
   .brand .ver { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin: 0 -3px 0 -4px; }
   .brand .ver:empty { display: none; }
-  .status-pill { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 100px; padding: 4px 11px; }
-  .status-pill.down { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+  .status-pill { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 100px; padding: 4px 11px; }
+  .status-pill.down { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
   .dot.live { animation: pulse 2s ease-in-out infinite; }
   .status-pill.down .dot { background: var(--warn); box-shadow: none; animation: none; }
@@ -72,14 +72,14 @@
   .namebox .you-suffix { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--faint); pointer-events: none; }
   .namebox input { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); font-family: var(--mono); font-size: 12.5px; border-radius: 8px; padding: 5px 34px 5px 9px; flex: 1; min-width: 0; }
   .namebox input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-  .host-chip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: border-color .15s ease, color .15s ease; }
-  .host-chip:hover { border-color: var(--border-strong); }
+  .host-chip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+  .host-chip:hover { background: var(--border); }
   .host-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .host-chip.copied { border-color: var(--accent); color: var(--accent-ink); }
+  .host-chip.copied { background: var(--accent-soft); color: var(--accent-ink); }
   .host-chip .lock { color: var(--accent); display: inline-flex; }
-  .chip-warn { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent); border-radius: 100px; padding: 2px 9px; white-space: nowrap; }
-  .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; text-decoration: none; }
-  .icon-btn:hover { color: var(--ink); border-color: var(--border-strong); }
+  .chip-warn { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 100px; padding: 2px 9px; white-space: nowrap; }
+  .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); border: 0; color: var(--muted); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
+  .icon-btn:hover { color: var(--ink); background: var(--border); }
   .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* uniform header control height */
   .status-pill, .host-chip, .namebox input { height: 32px; }
@@ -87,11 +87,11 @@
   /* ---------- grid ---------- */
   .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 7px; }
   .grid > * { min-width: 0; min-height: 0; }
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow-sm); }
-  .panel-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .panel { background: var(--surface); border-radius: var(--r); }
+  .panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; }
   .panel-title { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   /* uniform badge: count, files badge, presence tag, service state, self-signed chip */
-  .count, .badge, .tag-you, .svc-state, .chip-warn { font-family: var(--mono); font-size: 10px; font-weight: 700; line-height: 1.4; padding: 2px 7px; border-radius: 6px; letter-spacing: .03em; }
+  .count, .badge, .tag-you, .chip-warn { font-family: var(--mono); font-size: 10px; font-weight: 700; line-height: 1.4; padding: 2px 7px; border-radius: 6px; letter-spacing: .03em; }
   .count { color: var(--accent-ink); background: var(--accent-soft); }
 
   /* ---------- devices ---------- */
@@ -100,23 +100,30 @@
   .col-left .devices { flex: 1 1 auto; min-height: 0; }
   .devices { display: flex; flex-direction: column; }
   #roster { flex: 1; overflow-y: auto; min-height: 0; }
-  .dev { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-  .dev:last-child { border-bottom: 0; }
+  .dev { display: flex; align-items: center; gap: 10px; padding: 8px 14px; }
   .ava { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 700; color: #fff; }
   .dev-meta { min-width: 0; flex: 1; }
   .dev-name { font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dev-ip { font-family: var(--mono); font-size: 11px; color: var(--faint); }
   .presence { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
-  .tag-you { color: var(--muted); border: 1px solid var(--border); }
+  .tag-you { color: var(--muted); background: var(--surface-2); }
   .dev-empty { padding: 16px 14px; font-family: var(--mono); font-size: 12px; color: var(--faint); line-height: 1.5; }
 
   /* ---------- center ---------- */
   .center { display: flex; flex-direction: column; min-height: 0; }
-  .tabs { display: flex; align-items: center; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--border); }
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 8px 10px 4px; }
   .tab-spacer { flex: 1; }
-  .mini-btn { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; margin: 0 6px 6px 0; cursor: pointer; }
-  .mini-btn:hover { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
-  .dl.del:hover { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
+  /* buttons: quiet secondary by default; one filled primary per section; red only for destructive */
+  .mini-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--ink); background: var(--surface-2); border: 0; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background .15s, color .15s, filter .15s; }
+  .mini-btn[hidden] { display: none; } /* the display rule above would otherwise override hidden */
+  .mini-btn:hover:not(:disabled) { background: var(--border); }
+  .mini-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .mini-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mini-btn.btn-primary { background: var(--accent); color: #04150F; }
+  .mini-btn.btn-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.07); }
+  .mini-btn.btn-danger:hover:not(:disabled) { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
+  .form-err { font-family: var(--mono); font-size: 11.5px; color: var(--error); line-height: 1.45; }
+  .dl.del:hover { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
   .tab { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 9px 14px; border-radius: 8px 8px 0 0; position: relative; }
   .tab:hover { color: var(--ink); }
   .tab[aria-selected="true"] { color: var(--accent-ink); }
@@ -140,15 +147,16 @@
   .svc-cfg { max-width: none; } /* ssh/ftp use the full width so lines don't wrap */
   .svc-connect { display: flex; align-items: center; gap: 10px; }
   .svc-connect .svc-k { flex-shrink: 0; width: 68px; font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
-  .svc-box { display: inline-flex; align-items: stretch; width: min(100%, 440px); background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  .svc-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; display: flex; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 6px 9px; }
-  .svc-box .svc-copy { flex-shrink: 0; width: 30px; display: grid; place-items: center; border: 0; border-left: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
-  .svc-box .svc-copy:hover { color: var(--accent-ink); background: var(--surface); }
+  .svc-box { display: inline-flex; align-items: stretch; width: min(100%, 440px); background: var(--surface-2); border-radius: 8px; overflow: hidden; }
+  .svc-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; display: flex; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 7px 10px; }
+  .svc-box .svc-copy { flex-shrink: 0; width: 36px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+  .svc-box .svc-copy:hover { color: var(--accent-ink); background: var(--border); }
+  .svc-copy.copied, .copy.copied { color: var(--accent-ink); }
   /* sharing tab = browse (left) + sharing config (right) */
-  .share-split { flex: 1; min-height: 0; display: flex; }
+  .share-split { flex: 1; min-height: 0; display: flex; gap: 8px; }
   .share-browse { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
   .share-browse .brlist { flex: 1; min-height: 0; overflow-y: auto; }
-  .share-config { flex: 0 0 320px; min-height: 0; overflow-y: auto; border-left: 1px solid var(--border); }
+  .share-config { flex: 0 0 320px; min-height: 0; overflow-y: auto; }
   .share-config .cfg-wrap { padding: 14px; } .share-config .cfg { max-width: none; }
 
   /* chat */
@@ -158,12 +166,12 @@
   .msg-head { display: flex; align-items: baseline; gap: 8px; }
   .msg-who { font-family: var(--mono); font-size: 11.5px; font-weight: 700; }
   .msg-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
-  .bubble { background: var(--surface-2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 4px 12px 12px 12px; font-size: 13.5px; white-space: pre-wrap; word-break: break-word; }
-  .msg.me .bubble { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 26%, transparent); border-radius: 12px 4px 12px 12px; }
+  .bubble { background: var(--surface-2); padding: 8px 12px; border-radius: 4px 12px 12px 12px; font-size: 13.5px; white-space: pre-wrap; word-break: break-word; }
+  .msg.me .bubble { background: var(--accent-soft); border-radius: 12px 4px 12px 12px; }
   .sys { align-self: center; font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; }
   .file-msg { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-  .file-msg .fi { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); color: var(--accent); flex-shrink: 0; }
-  .composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+  .file-msg .fi { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; }
+  .composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 12px; }
   .composer textarea { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 1.4; min-width: 0; resize: none; height: 40px; max-height: 120px; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
   .composer textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
   /* keep the placeholder on one line, truncated with an ellipsis, instead of wrapping on narrow screens */
@@ -187,34 +195,36 @@
   .drop strong { font-family: var(--mono); font-weight: 700; color: var(--ink); }
   .drop small { font-family: var(--mono); color: var(--faint); }
   .flist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-  .frow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); }
-  .frow .fi { width: 34px; height: 34px; border-radius: 7px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent); flex-shrink: 0; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
+  .frow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); transition: background .15s; }
+  .frow .fi { width: 34px; height: 34px; border-radius: 7px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
   .frow .fmeta { flex: 1; min-width: 0; }
   .frow .fname { font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .frow .fsub { font-family: var(--mono); font-size: 11px; color: var(--faint); }
   .frow .fsize { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .frow.uploading { border-style: dashed; }
-  .uprog { margin-top: 5px; height: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .frow.uploading { background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
+  .uprog { margin-top: 5px; height: 4px; background: var(--surface); border-radius: 3px; overflow: hidden; }
   .upbar { height: 100%; background: var(--accent); border-radius: 3px; transition: width .12s ease; }
-  .dl { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); color: var(--muted); background: var(--surface-2); cursor: pointer; text-decoration: none; }
-  .dl:hover { color: var(--accent-ink); border-color: var(--accent); }
+  .dl { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; color: var(--muted); background: var(--surface); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
+  .dl:hover { color: var(--accent-ink); background: var(--accent-soft); }
   .files-empty { font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: center; padding: 10px; }
   /* browse pane (inside the sharing tab) */
   .browse-bar { display: flex; align-items: center; gap: 8px; }
   .brpath { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .brlist { overflow-y: auto; min-height: 0; }
   .frow.dir { cursor: pointer; }
-  .frow.dir:hover { border-color: var(--accent); }
+  .frow.dir:hover { background: var(--accent-soft); }
   /* admin: file browsing / live site / servers (shown as center tabs) */
   .br-status { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.5; word-break: break-all; }
-  .br-picker { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .br-picker { background: var(--surface-2); border-radius: var(--r-sm); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .br-picker .mini-btn { background: var(--surface); }
+  .br-picker .mini-btn:hover:not(:disabled) { background: var(--border); }
   .br-pick-bar { display: flex; align-items: center; gap: 8px; }
   .nav-btns { display: flex; gap: 4px; }
   .br-pick-list { max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .br-pick-item { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 6px 8px; border-radius: 6px; cursor: pointer; }
   .br-pick-item span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .br-pick-item .bic { color: var(--accent); display: inline-flex; flex-shrink: 0; }
-  .br-pick-item:hover { background: var(--surface-2); }
+  .br-pick-item:hover { background: var(--surface); }
   .br-pick-item.empty { color: var(--faint); cursor: default; }
   .br-write { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .px-field { display: flex; flex-direction: column; gap: 4px; }
@@ -232,21 +242,10 @@
   .v { font-family: var(--mono); font-size: 13px; color: var(--ink); word-break: break-all; }
   .fingerprint { display: flex; align-items: center; gap: 8px; }
   .fingerprint .v { font-size: 11.5px; color: var(--muted); }
-  .qr { width: 140px; height: 140px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
-  .dev-qr { margin-top: auto; padding: 10px 12px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); cursor: pointer; flex-shrink: 0; }
-  .copy:hover { color: var(--accent-ink); border-color: var(--accent); }
-  .svc { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .svc:last-of-type { border-bottom: 0; }
-  .svc-ico { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); flex-shrink: 0; }
-  .svc.up .svc-ico { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
-  .svc-meta { flex: 1; min-width: 0; }
-  .svc-name { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 13.5px; font-weight: 700; }
-  .svc-name .lock { color: var(--accent); display: inline-flex; }
-  .svc-sub { font-family: var(--mono); font-size: 11px; color: var(--faint); word-break: break-word; }
-  .svc-state { text-transform: uppercase; }
-  .st-up { color: var(--accent-ink); background: var(--accent-soft); }
-  .st-down { color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
+  .qr { width: 140px; height: 140px; background: #fff; border-radius: 8px; padding: 8px; }
+  .dev-qr { margin-top: auto; padding: 12px 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--surface-2); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: background .15s, color .15s; }
+  .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
   .switch { position: relative; width: 40px; height: 23px; flex-shrink: 0; cursor: pointer; }
   .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
   .track { position: absolute; inset: 0; border-radius: 20px; background: var(--idle); transition: background .18s; }
@@ -289,11 +288,11 @@
     .cfg-wrap { padding: 12px; }
     /* sharing: config on top, browse below */
     .share-split { flex-direction: column-reverse; }
-    .share-config { flex: 0 0 auto; border-left: 0; border-bottom: 1px solid var(--border); }
+    .share-config { flex: 0 0 auto; }
     .share-browse { min-height: 45vh; }
-    .devices .panel-head { border-bottom: 0; padding-bottom: 4px; }
+    .devices .panel-head { padding-bottom: 4px; }
     #roster { display: flex; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 12px 12px; }
-    .dev { flex: 0 0 auto; border-bottom: 0; border: 1px solid var(--border); border-radius: 9px; padding: 5px 8px; gap: 7px; }
+    .dev { flex: 0 0 auto; background: var(--surface-2); border-radius: 9px; padding: 5px 8px; gap: 7px; }
     .ava { width: 24px; height: 24px; border-radius: 6px; font-size: 10px; }
     .dev-ip { display: none; }
     .dev-name { font-size: 12px; max-width: 96px; }
@@ -363,7 +362,7 @@
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ftp" id="ftpTab" hidden><span class="tdot" id="ftpDot"></span>ftp</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ssh" id="sshTab" hidden><span class="tdot" id="sshDot"></span>ssh</button>
           <span class="tab-spacer"></span>
-          <button class="mini-btn" id="clearBtn" type="button">clear files</button>
+          <button class="mini-btn btn-danger" id="clearBtn" type="button">clear files</button>
         </div>
 
         <div class="view" id="view-chat" role="tabpanel">
@@ -413,9 +412,10 @@
                   <label class="br-write"><input type="checkbox" id="brWrite" /> allow uploads (writable)</label>
                 </div>
                 <div class="br-actions">
-                  <button class="mini-btn" id="brShare" type="button">share this folder</button>
+                  <button class="mini-btn btn-primary" id="brShare" type="button" disabled>share this folder</button>
                   <button class="mini-btn" id="brStop" type="button" hidden>stop sharing</button>
                 </div>
+                <div class="form-err" id="brErr" role="alert" hidden></div>
                 <div class="rail-note">
                   <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
                   Exposes the chosen folder to everyone on the network (no login). Off by default.
@@ -431,9 +431,10 @@
             <label class="px-field"><span class="px-label">Target (your running server)</span><input id="pxTarget" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:3000" /></label>
             <label class="px-field"><span class="px-label">Serve on port</span><input id="pxPort" type="number" min="1" max="65535" value="8080" /></label>
             <div class="br-actions">
-              <button class="mini-btn" id="pxShare" type="button">serve this site</button>
+              <button class="mini-btn btn-primary" id="pxShare" type="button" disabled>serve this site</button>
               <button class="mini-btn" id="pxStop" type="button" hidden>stop</button>
             </div>
+            <div class="form-err" id="pxErr" role="alert" hidden></div>
             <div class="rail-note">
               <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
               Re-serves a web app you're running (any http/https/node) to everyone on the network, over HTTPS. Off by default.
@@ -689,7 +690,7 @@
       fetch("/admin/services/"+id+"/"+action,{method:"POST"}).then(r=>r.json()).then(l=>{renderServices(l);loadStatus();}).catch(checkAdmin);
     });
     [[id+"Copy", id+"Cmd"], [id+"PassCopy", id+"Pass"]].forEach(([b,t])=>{
-      const btn=$(b); if(btn) btn.addEventListener("click",()=>{ if(navigator.clipboard) navigator.clipboard.writeText($(t).textContent); });
+      const btn=$(b); if(btn) btn.addEventListener("click",()=>copyText(btn, $(t).textContent));
     });
   });
   let hostMode=false, brEnabled=false;
@@ -790,6 +791,8 @@
   function loadPicker(path){
     fetch("/admin/browse/dirs?path="+encodeURIComponent(path||"")).then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(p=>{
       brPickCur=p.current||""; brPickParent=p.parent||"";
+      $("brShare").disabled = !brPickCur; // nothing to share until a folder is open
+      $("brErr").hidden = true;
       $("brPickPath").textContent = p.current || "(start)";
       $("brPickUp").style.visibility = p.current ? "" : "hidden";
       $("brPickRoot").style.visibility = p.current ? "" : "hidden";
@@ -801,9 +804,14 @@
   $("brPickUp").addEventListener("click",()=>loadPicker(brPickParent));
   $("brPickRoot").addEventListener("click",()=>loadPicker(""));
   $("brShare").addEventListener("click",()=>{
-    if(!brPickCur){ alert("Open a folder first, then share it."); return; }
+    if(!brPickCur) return;
+    const btn=$("brShare"), err=$("brErr");
+    err.hidden=true; btn.disabled=true; btn.textContent="sharing…";
     fetch("/admin/browse?enabled=true&writable="+$("brWrite").checked+"&path="+encodeURIComponent(brPickCur),{method:"POST"})
-      .then(r=>r.json()).then(()=>{ loadAdmBrowse(); loadBrowseInfo(); openBrowse(""); }).catch(()=>{});
+      .then(r=>{ if(!r.ok) throw 0; return r.json(); })
+      .then(()=>{ loadAdmBrowse(); loadBrowseInfo(); openBrowse(""); })
+      .catch(()=>{ err.textContent="Couldn't share that folder - it may have moved, or servd can't read it. Pick another folder and try again."; err.hidden=false; })
+      .finally(()=>{ btn.textContent="share this folder"; btn.disabled=!brPickCur; });
   });
   $("brStop").addEventListener("click",()=>{
     fetch("/admin/browse?enabled=false",{method:"POST"}).then(()=>{ loadAdmBrowse(); loadBrowseInfo(); }).catch(()=>{});
@@ -817,6 +825,7 @@
         $("pxStop").hidden=false;
         if(c.target) $("pxTarget").value=c.target;
         if(c.port) $("pxPort").value=c.port;
+        syncPxBtn();
       } else {
         $("pxStatus").textContent="Off - no live site is being served.";
         $("pxStop").hidden=true;
@@ -824,11 +833,25 @@
       $("liveDot").classList.toggle("on", c.enabled);
     }).catch(()=>{});
   }
+  // "serve this site" is only clickable once there's a target; editing either field clears a stale error.
+  function syncPxBtn(){ $("pxShare").disabled = !$("pxTarget").value.trim(); }
+  $("pxTarget").addEventListener("input",()=>{ syncPxBtn(); $("pxErr").hidden=true; });
+  $("pxPort").addEventListener("input",()=>{ $("pxErr").hidden=true; });
+  syncPxBtn();
   $("pxShare").addEventListener("click",()=>{
     const t=$("pxTarget").value.trim(); const p=($("pxPort").value.trim()||"8080");
-    if(!t){ alert("Enter the address of the site you're running first, e.g. http://localhost:3000"); return; }
+    const btn=$("pxShare"), err=$("pxErr");
+    if(!t) return;
+    if(!/^\d+$/.test(p) || +p<1 || +p>65535){ err.textContent="Port must be a number from 1 to 65535 (8080 works for most setups)."; err.hidden=false; return; }
+    err.hidden=true; btn.disabled=true; btn.textContent="starting…";
     fetch("/admin/proxy?enabled=true&target="+encodeURIComponent(t)+"&port="+encodeURIComponent(p),{method:"POST"})
-      .then(r=>r.json()).then(c=>{ if(!c.enabled) alert("Couldn't start it - is that port free and the target reachable?"); loadAdmProxy(); }).catch(()=>{});
+      .then(r=>r.json())
+      .then(c=>{
+        if(!c.enabled){ err.textContent="Couldn't start on port "+p+" - it's probably in use by another program. Try a different port, e.g. "+(+p===8080?8081:8080)+"."; err.hidden=false; }
+        loadAdmProxy();
+      })
+      .catch(()=>{ err.textContent="Couldn't reach servd to start the site. Check that servd is still running, then try again."; err.hidden=false; })
+      .finally(()=>{ btn.textContent="serve this site"; syncPxBtn(); });
   });
   $("pxStop").addEventListener("click",()=>{
     fetch("/admin/proxy?enabled=false",{method:"POST"}).then(()=>loadAdmProxy()).catch(()=>{});
@@ -855,7 +878,17 @@
   });
 
   // ---- copy fingerprint ----
-  $("copyfp").addEventListener("click",()=>{ if(navigator.clipboard) navigator.clipboard.writeText($("admFp").textContent); });
+  $("copyfp").addEventListener("click",()=>copyText($("copyfp"), $("admFp").textContent));
+  // Copy buttons acknowledge immediately: the icon flips to a check mark for a moment.
+  const CHECKICON='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function copyText(btn, text){
+    if(!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(()=>{
+      if(btn._t) clearTimeout(btn._t); else { btn._icon=btn.innerHTML; btn._title=btn.title; }
+      btn.innerHTML=CHECKICON; btn.classList.add("copied"); btn.title="Copied";
+      btn._t=setTimeout(()=>{ btn.innerHTML=btn._icon; btn.title=btn._title; btn.classList.remove("copied"); btn._t=null; }, 1200);
+    }).catch(()=>{});
+  }
 
   // ---- copy share URL (click the host chip) ----
   (function(){

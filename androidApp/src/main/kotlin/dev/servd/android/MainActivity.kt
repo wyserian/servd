@@ -9,8 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -99,42 +102,53 @@ class MainActivity : Activity() {
         }
         root.addView(statusText)
 
+        // One filled primary per state (Start when stopped, Open dashboard when running); quiet
+        // secondaries; the destructive Stop last and visually quieter.
         startButton = button("Start hub", accent, Color.WHITE) { startHub() }
-        stopButton = button("Stop hub", Color.parseColor("#B23A3A"), Color.WHITE) { ServdHostService.stop(this) }
-        openButton = button("Open dashboard", Color.WHITE, ink) { openDashboard() }
+        openButton = button("Open dashboard", accent, Color.WHITE) { openDashboard() }
         copyButton = button("Copy share URL", Color.WHITE, ink) { copyUrl() }
         storageButton = button("Allow file browsing (storage access)", Color.WHITE, ink) { requestAllFilesAccess() }
+        stopButton = button("Stop hub", Color.parseColor("#F6E3E2"), Color.parseColor("#B23A3A")) { ServdHostService.stop(this) }
 
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(startButton)
-            addView(stopButton)
             addView(openButton)
             addView(copyButton)
             addView(storageButton)
+            addView(stopButton)
         }
         root.addView(buttons)
 
-        // Scan-to-join QR, right under the action buttons.
+        // Connection card (borderless, tonal): scan-to-join QR, then the connection details.
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(Color.WHITE, dp(12))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(16); bottomMargin = dp(8) }
+        }
         qr = ImageView(this).apply {
             val size = dp(200)
             layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                topMargin = dp(16); bottomMargin = dp(4); gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(4); bottomMargin = dp(4); gravity = Gravity.CENTER_HORIZONTAL
             }
             visibility = View.GONE
         }
-        root.addView(qr)
+        card.addView(qr)
 
-        // Connection details (each field label bold), then the app version pinned at the bottom.
+        // Connection details (each field label bold); the app version is pinned below the card.
         detailText = TextView(this).apply {
             setTextColor(ink)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.MONOSPACE
             setLineSpacing(dp(2).toFloat(), 1f)
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(0, dp(8), 0, dp(4))
             setTextIsSelectable(true)
         }
-        root.addView(detailText)
+        card.addView(detailText)
+        root.addView(card)
 
         root.addView(TextView(this).apply {
             text = "v${Servd.VERSION}"
@@ -186,6 +200,7 @@ class MainActivity : Activity() {
             else "Allow file browsing (storage access)"
         storageButton.isEnabled = !hasAllFilesAccess()
 
+        statusText.setTextColor(if (running) accent else muted)
         if (info == null || !running) {
             statusText.text = "Hub is stopped"
             qr.visibility = View.GONE
@@ -284,18 +299,30 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Borderless rounded button with a touch ripple (instant feedback) and a 48dp tap target. */
     private fun button(label: String, bg: Int, fg: Int, onClick: () -> Unit): Button =
         Button(this).apply {
             text = label
             isAllCaps = false
             setTextColor(fg)
-            setBackgroundColor(bg)
+            background = RippleDrawable(
+                ColorStateList.valueOf(Color.argb(40, Color.red(fg), Color.green(fg), Color.blue(fg))),
+                rounded(bg, dp(10)),
+                null,
+            )
+            stateListAnimator = null // flat: no elevation shadow
+            minHeight = dp(48)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = dp(10) }
             setOnClickListener { onClick() }
         }
+
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = radius.toFloat()
+    }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
