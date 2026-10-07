@@ -143,7 +143,7 @@ From the repo root:
 opens the dashboard in your browser. You'll see:
 
 ```
-servd v1.5.0 - local-network server tool
+servd v1.6.0 - local-network server tool
 
 admin   : https://127.0.0.1:8443   (this machine only)
 serving : https://10.205.210.12:8443   (share with other devices)
@@ -455,8 +455,8 @@ each artifact is built on its native runner, then all are attached to a GitHub R
 2. Commit, then tag and push. The tag must be `v<servdVersion>`:
 
    ```bash
-   git tag v1.5.0
-   git push origin v1.5.0
+   git tag v1.6.0
+   git push origin v1.6.0
    ```
 
 CI verifies the tag matches the version, builds all three artifacts, and publishes the release with
