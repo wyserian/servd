@@ -81,6 +81,10 @@
   .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); border: 0; color: var(--muted); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
   .icon-btn:hover { color: var(--ink); background: var(--border); }
   .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #bell.on { color: var(--accent-ink); background: var(--accent-soft); }
+  #bell.on .bell-slash { display: none; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60; width: max-content; max-width: min(92vw, 440px); background: var(--ink); color: var(--bg); font-size: 13px; line-height: 1.45; padding: 10px 14px; border-radius: var(--r); box-shadow: var(--shadow); }
+  .toast[hidden] { display: none; }
   /* uniform header control height */
   .status-pill, .host-chip, .namebox input { height: 32px; }
 
@@ -343,6 +347,7 @@
 </style>
 </head>
 <body>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="lock-screen" id="lockScreen" hidden>
     <form class="lock-box" id="lockForm" autocomplete="off">
       <div class="brand"><span class="prompt">~/</span>servd</div>
@@ -361,6 +366,9 @@
       <span class="spacer"></span>
       <span class="namebox"><input id="name" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Your display name" /><span class="you-suffix" aria-hidden="true">you</span></span>
       <span class="host-chip" id="hostChip" role="button" tabindex="0" title="Click to copy the share URL"><span class="lock" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span id="hostUrl">-</span></span>
+      <button class="icon-btn" id="bell" aria-pressed="false" aria-label="Notifications for new messages and files" title="Notify me about new messages and files">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 21h4"/><path class="bell-slash" d="M4 4l16 16"/></svg>
+      </button>
       <button class="icon-btn" id="theme" aria-label="Toggle light / dark theme" title="Toggle light / dark">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
       </button>
@@ -423,7 +431,7 @@
       <section class="panel center" aria-label="Chat and files">
         <div class="tabs" role="tablist">
           <button class="tab" role="tab" aria-selected="true" data-view="files"><span class="tdot" id="filesDot"></span>drop files<span class="badge" id="fbadge" style="display:none">0</span></button>
-          <button class="tab" role="tab" aria-selected="false" data-view="chat"><span class="tdot" id="chatDot"></span>chat</button>
+          <button class="tab" role="tab" aria-selected="false" data-view="chat"><span class="tdot" id="chatDot"></span>chat<span class="badge" id="cbadge" style="display:none" aria-label="unread messages">0</span></button>
           <button class="tab" role="tab" aria-selected="false" data-view="sharing" id="sharingTab" hidden><span class="tdot" id="sharingDot"></span>browse files</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="live" id="liveTab" hidden><span class="tdot" id="liveDot"></span>serve site</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ftp" id="ftpTab" hidden><span class="tdot" id="ftpDot"></span>ftp</button>
@@ -579,7 +587,8 @@
   // NB: named userName, not name, to avoid colliding with the global window.name (always a string).
   let userName = localStorage.getItem("servd-name") || ("guest-" + Math.floor(1000 + Math.random()*9000));
   nameInput.value = userName;
-  function setTitle(){ document.title = (userName ? userName + " · " : "") + "servd"; }
+  let unseen = 0; // messages/files from others since this page was last looked at (see "new-activity alerts")
+  function setTitle(){ document.title = (unseen ? "(" + unseen + ") " : "") + (userName ? userName + " · " : "") + "servd"; }
   setTitle();
   let selfId=null, ws=null, retry=null, lastConnected=0;
   const files = new Map();
@@ -678,6 +687,7 @@
         '<a class="bubble file-msg" href="/files/zip?batch='+encodeURIComponent(f.batch)+'" download><span class="fi">'+FICON+'</span>shared <b>'+esc(topName(f))+'/</b> &middot; <span class="fcount"></span></a>';
       log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
       m={el,count:0,size:0}; folderMsgs.set(f.batch,m);
+      if(!mine) noteActivity(f.fromName, "shared the folder "+topName(f)+"/", "files");
     }
     m.count++; m.size+=f.size;
     m.el.querySelector(".fcount").textContent = m.count+" file"+(m.count===1?"":"s")+" · "+fmtSize(m.size);
@@ -768,7 +778,10 @@
   }
   function addFile(f, announce){
     const isNew=!files.has(f.id); files.set(f.id,f); renderFiles();
-    if(isNew&&announce){ if(f.batch) addFolderMsg(f); else addFileMsg(f); }
+    if(isNew&&announce){
+      if(f.batch) addFolderMsg(f); // alerts once, when the folder's first file arrives
+      else { addFileMsg(f); if(f.fromName!==userName) noteActivity(f.fromName, "shared "+f.name+" ("+fmtSize(f.size)+")", "files"); }
+    }
   }
   function loadFiles(){ fetch("/files").then(r=>r.json()).then(list=>{ list.forEach(f=>files.set(f.id,f)); renderFiles(); }).catch(()=>{}); }
   // ---- drop-files storage: usage line, and refusing what can't fit before uploading it ----
@@ -1167,6 +1180,74 @@
     if(tab.dataset.view==="sharing") showBrowsePane();
   }));
   function activeView(){ return document.querySelector('.tab[aria-selected="true"]').dataset.view; }
+  function selectView(view){ const t=document.querySelector('.tab[data-view="'+view+'"]'); if(t && !t.hidden) t.click(); }
+
+  // ---- new-activity alerts ----
+  // While the page isn't being looked at: "(n)" in the title and a dot on the favicon, plus an
+  // opt-in browser notification (bell in the top bar). On another dashboard tab: an unread
+  // count on the chat tab. Only chat messages and files from others count.
+  let chatUnread=0;
+  const iconLink=document.querySelector('link[rel="icon"]'), baseIcon=iconLink ? iconLink.href : null;
+  let dotIcon=null;
+  function setFavDot(on){
+    if(!iconLink || !baseIcon) return;
+    if(on && !dotIcon){
+      try{ dotIcon="data:image/svg+xml;base64,"+btoa(atob(baseIcon.split(",")[1]).replace("</svg>",'<circle cx="78" cy="18" r="16" fill="#E5484D" stroke="#fff" stroke-width="4"/></svg>')); }
+      catch{ return; }
+    }
+    iconLink.href = on ? dotIcon : baseIcon;
+  }
+  function renderChatBadge(){ const b=$("cbadge"); b.textContent=chatUnread>99?"99+":chatUnread; b.style.display=chatUnread?"":"none"; }
+  function away(){ return document.hidden || !document.hasFocus(); }
+  function noteActivity(who, text, view){
+    if(view==="chat" && (away() || activeView()!=="chat")){ chatUnread++; renderChatBadge(); }
+    if(!away()) return;
+    unseen++; setTitle(); setFavDot(true);
+    notify(who, text, view);
+  }
+  function seen(){
+    if(away()) return;
+    if(unseen){ unseen=0; setTitle(); setFavDot(false); }
+    if(activeView()==="chat" && chatUnread){ chatUnread=0; renderChatBadge(); }
+  }
+  document.addEventListener("visibilitychange", seen);
+  window.addEventListener("focus", seen);
+  document.querySelector('.tab[data-view="chat"]').addEventListener("click",()=>{ chatUnread=0; renderChatBadge(); });
+
+  // Browser notifications: off until turned on with the bell (remembered per device).
+  const canNotify = "Notification" in window;
+  let notifyOn=false;
+  try{ notifyOn = localStorage.getItem("servd-notify")==="on" && canNotify && Notification.permission==="granted"; }catch{}
+  function setNotify(on){
+    notifyOn=on;
+    try{ localStorage.setItem("servd-notify", on?"on":"off"); }catch{}
+    const b=$("bell"); b.classList.toggle("on",on); b.setAttribute("aria-pressed",on);
+    b.title = on ? "Notifications on - click to turn off" : "Notify me about new messages and files";
+  }
+  setNotify(notifyOn);
+  let toastTimer=null;
+  function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.hidden=true; },5000); }
+  function notify(who, text, view){
+    if(!notifyOn || !canNotify || Notification.permission!=="granted") return;
+    try{
+      // One notification per view, replaced by newer ones, so a burst doesn't stack up.
+      const n=new Notification(who, {body:text, tag:"servd-"+view, icon: baseIcon || undefined});
+      n.onclick=()=>{ window.focus(); selectView(view); n.close(); };
+    }catch{}
+  }
+  $("bell").addEventListener("click",()=>{
+    if(notifyOn){ setNotify(false); toast("Notifications off. The tab title still shows new activity."); return; }
+    if(!canNotify){ toast("This browser can't show notifications here. The tab title still shows new activity."); return; }
+    if(Notification.permission==="denied"){ toast("Notifications are blocked for this site. Allow them in the browser's site settings, then try again."); return; }
+    const ask = Notification.permission==="granted" ? Promise.resolve("granted") : Promise.resolve(Notification.requestPermission());
+    ask.then(p=>{
+      if(p!=="granted"){ toast("Notifications weren't allowed. The tab title still shows new activity."); return; }
+      try{
+        new Notification("servd", {body:"Notifications are on. You'll get one when a message or file arrives while this page is in the background.", tag:"servd-test", icon: baseIcon || undefined});
+        setNotify(true);
+      }catch{ toast("This browser can't show notifications on this page. The tab title still shows new activity."); }
+    }).catch(()=>toast("Couldn't turn on notifications in this browser."));
+  });
   function updateClearBtn(){ const v=activeView(); $("clearBtn").style.display = (v==="files"||v==="chat") ? "" : "none"; $("clearBtn").textContent = v==="files" ? "clear files" : "clear chat"; $("dlAllBtn").style.display = v==="files" ? "" : "none"; }
   // Download all: the server streams one zip; the button acknowledges the click right away.
   $("dlAllBtn").addEventListener("click",()=>{
@@ -1254,7 +1335,7 @@
       switch(m.type){
         case "welcome": selfId=m.selfId; break;
         case "roster": renderRoster(m.peers); break;
-        case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); break;
+        case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); if(m.fromId!==selfId) noteActivity(m.fromName, m.text.length>140 ? m.text.slice(0,140)+"…" : m.text, "chat"); break;
         case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
         case "file": addFile(m.file,true); loadUsage(); break;
         case "chatCleared": log.innerHTML=""; folderMsgs.clear(); addSys("chat cleared by "+esc(m.byName)); break;

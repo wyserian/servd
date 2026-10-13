@@ -47,6 +47,9 @@ tab. The tabs that configure the host appear only on the host itself.
   host can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
   Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone.
+- **Activity alerts:** a message or file from someone else while you're away puts a count in the
+  tab title and a dot on its icon. The chat tab shows unread messages. The bell in the top bar turns
+  on browser notifications (per device; some browsers don't allow them on a self-signed page).
 - **Browse files** (optional): the host shares a real folder, read-only or with uploads. Clients
   can open subfolders, download single files, or download the current folder as a zip. The share
   is locked to the chosen folder.
