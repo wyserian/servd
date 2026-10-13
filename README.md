@@ -7,140 +7,75 @@
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-informational)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin&logoColor=white)
 
-**A portable local-network server tool.** Run it on a computer or an Android phone and that device
-becomes a hub other devices on the same Wi-Fi or hotspot reach straight from a browser - no client
-to install. It serves an encrypted dashboard with real-time chat, a live roster of who's connected,
-drag-n-drop file sharing, a browsable view of a host-chosen folder, a reverse proxy that re-serves a
-running web app to the LAN, and built-in SSH/SFTP and FTPS servers. Everything is a tab in the
-dashboard; the tabs that configure the host appear only on the host itself.
+## About
 
-Every transport is encrypted - HTTPS/WSS, SSH, FTPS. A LAN has no certificate authority, so the
-self-signed certificate is verified by its **SHA-256 fingerprint** rather than a CA. The same stack
-hosts on desktop (Windows, Linux, macOS) and Android - a phone is a full hub, not a lesser client -
-and the UI is the served dashboard on every platform.
+**servd is a portable local-network hub.** Run it on a computer or an Android phone, and every
+device on the same Wi-Fi or hotspot can use it from a browser. Nothing needs installing on those
+devices. A phone is a full hub, running the same stack as desktop (Windows, Linux, macOS). The served
+dashboard is the UI everywhere; Android adds only a thin native control screen.
 
----
+The host serves one HTTPS dashboard. It offers chat, file sharing, a shared host folder, and a
+reverse proxy for a running web app, plus optional SSH/SFTP and FTPS servers. Each feature is a
+tab. The tabs that configure the host appear only on the host itself.
 
-## Contents
+- **Trusted-LAN tool:** there's no account or PIN, and admin controls work only on the host
+  device. SSH/FTP use real credentials. See [Security](#security).
+- **Fully offline:** servd talks only to devices on your network. The dashboard is
+  self-contained, with no CDN, webfonts, analytics or telemetry, and it works on a hotspot with no
+  uplink. Internet is needed only for the first source build, to download dependencies.
+- **Encrypted:** all traffic is encrypted (HTTPS/WSS, SSH, FTPS). A LAN has no certificate
+  authority, so the self-signed certificate is checked by its **SHA-256 fingerprint** instead.
 
-- [Overview](#overview)
+## Table of Contents
+
 - [Features](#features)
-- [Download](#download)
-- [Requirements](#requirements)
-- [Quick start (desktop)](#quick-start-desktop)
-- [Android](#android)
-- [Usage & configuration](#usage--configuration)
-- [Security model](#security-model)
-- [Packaging](#packaging)
-- [Releases](#releases)
+- [Getting Started](#getting-started)
+- [Security](#security)
 - [Architecture](#architecture)
-- [Building & testing](#building--testing)
-- [Troubleshooting](#troubleshooting)
-- [Tech stack & versions](#tech-stack--versions)
+- [Tech Stack](#tech-stack)
+- [Development](#development)
 - [License](#license)
-
----
-
-## Overview
-
-servd turns one device into a hub for a trusted local network. The host runs a single HTTPS server
-that serves a web dashboard - real-time chat, file sharing, a browsable host folder, and a reverse
-proxy for a running web app - plus two optional file-transfer servers (SSH/SFTP and FTPS). Each of
-these is a **tab** in the dashboard; the tabs that configure the host (folder sharing, serve-site,
-ssh, ftp) are gated to the host itself. Other devices join by opening the hub's URL in a browser (or
-scanning a QR) - no client to install.
-
-The **same stack runs on desktop and Android**; a phone is a full hub, not a lesser version. The UI
-is the served web dashboard on every platform (no native app UI beyond a thin Android control
-screen).
-
-It is a **trusted-LAN tool**: there is no account or PIN gate on the dashboard, the admin controls
-are reachable only from the host device itself, and the SSH/FTP servers use real credentials. See
-[Security model](#security-model).
-
-**Fully offline.** servd needs no internet to run. It talks only to devices on your local network,
-serves a self-contained dashboard (no CDN, webfonts, analytics, or telemetry), and works on an
-isolated Wi-Fi or hotspot with no uplink. The only time internet is used is the **first build**, to
-download dependencies; a packaged build - or one you've already built - runs with none.
-
----
 
 ## Features
 
-- **HTTPS dashboard** bound to your LAN/hotspot IP on port `8443`, with light/dark themes.
-- **Real-time chat** between everyone connected, over WSS (multi-line, clear-for-everyone).
-- **Connected-device roster** - see who is on the hub, live, with join/leave.
-- **Drag-n-drop file sharing** - drop a file and it appears on every device instantly; download,
-  delete one, or clear all.
-- **Browse a host-chosen folder** (optional) - the host can serve a real directory (read-only, or
-  with uploads) that clients list, traverse, and download in the **browse files** tab; off by
-  default, set up right in that tab (host only), and jailed to the chosen folder.
-- **Serve a live site** (optional) - the **serve site** tab is a built-in reverse proxy that
-  re-serves a web app you're running (any HTTP/HTTPS server - a Node/Vite dev server, a static host,
-  another service) to the whole LAN over servd's HTTPS, on a dedicated port. Handles WebSockets
-  (HMR / live-reload); off by default.
-- **Scan-to-join QR** of the hub URL, so a phone joins without typing an IP.
-- **SSH/SFTP server** (optional) - the **ssh** tab toggles credentialed SFTP jailed to the shared
-  files, no OS shell.
-- **FTPS server** (optional) - the **ftp** tab toggles explicit-TLS FTP, same credential, jailed to
-  the shared files.
-- **Auto-discovery (mDNS)** - the hub advertises `_servd._tcp`; other devices find it without an IP.
-- **Host-only tabs** - the folder-sharing, serve-site, ssh, and ftp tabs (and a host-info card with
-  the cert fingerprint) show only on the host, served on loopback; each host tab shows a live status
-  dot.
-- **Self-signed TLS** with a printed, verifiable SHA-256 fingerprint.
-- **Desktop CLI** that starts the hub, prints the fingerprint, and auto-opens the dashboard.
-- **Android host** with a foreground service (survives backgrounding) and a native control screen.
-- **Fully offline** - LAN only, with a self-contained dashboard (no CDN, webfonts, or telemetry).
+- **HTTPS dashboard** on port `8443`, bound to your LAN or hotspot IP, with light and dark themes.
+- **Drop files:** drag and drop a file and it appears on every device. Download files one at a
+  time or all as one zip, delete one, or clear them all.
+- **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
+  Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone.
+- **Browse files** (optional): the host shares a real folder, read-only or with uploads. Clients
+  can open subfolders, download single files, or download the current folder as a zip. The share
+  is locked to the chosen folder.
+- **Serve site** (optional): a reverse proxy that re-serves a running web app (Node/Vite dev
+  server, static host, any HTTP/HTTPS service) to the LAN over servd's HTTPS, on its own port.
+  WebSockets and HMR/live reload work.
+- **SSH/SFTP and FTPS** (optional): FTPS uses explicit TLS. Both use a generated password and are
+  limited to the shared files. There's no OS shell. Each tab shows a copyable connect command.
+- **Easy joining:** a scan-to-join QR code, plus mDNS discovery (`_servd._tcp`, or run
+  `servd discover`).
+- **Host-only tabs:** browse setup, serve site, ssh and ftp, plus a host card with the fingerprint.
+  These are served only on loopback, each with a dot showing whether it's live.
+- **Desktop CLI:** starts the hub, prints the fingerprint, and opens the dashboard.
+- **Android host:** a foreground service keeps the hub alive in the background, and a native screen
+  controls it.
 
----
+## Getting Started
 
-## Download
+### Installation
 
-Grab a prebuilt build from the [**latest release**](https://github.com/wyserian/servd/releases/latest)
-- no toolchain or build step needed:
+Get a build from the [**latest release**](https://github.com/wyserian/servd/releases/latest).
+Desktop builds bundle their own Java runtime, so nothing else is needed. To build it yourself, see
+[Development](#development).
 
-| Platform | Asset | Run it |
+| Platform | Asset | Run |
 |---|---|---|
-| **Windows** | `servd-<version>-windows.zip` | unzip, then run `servd\servd.exe` |
-| **Linux** | `servd-<version>-x86_64.AppImage` | `chmod +x` it, then run it |
-| **Android** | `servd-<version>-release.apk` | install the APK (allow "unknown sources") |
+| Windows | `servd-<version>-windows.zip` | unzip, run `servd\servd.exe` |
+| Linux | `servd-<version>-x86_64.AppImage` | `chmod +x`, run it |
+| Android | `servd-<version>-release.apk` | install it (allow unknown sources) |
 
-The desktop builds bundle their own Java runtime, so nothing else is required. Prefer to build it
-yourself? See [Quick start](#quick-start-desktop).
+### Connecting Devices
 
----
-
-## Requirements
-
-**To build from source:**
-
-- **JDK 17 or newer** (JDK 21 is fine - the build targets Java 17 bytecode). No separate Gradle
-  install is needed; the repo ships a Gradle wrapper.
-- **Internet access on the first build only**, to download Gradle and dependencies. Nothing after
-  that reaches the internet - servd itself runs fully offline.
-- For the Android app, the **Android SDK**, with `local.properties` pointing at it, e.g.
-  `sdk.dir=C:\\Android`.
-
-**To run:** nothing beyond a JVM (a packaged desktop build bundles its own JRE, so it needs
-nothing at all), plus a Wi-Fi or hotspot network - which does **not** need an internet uplink.
-
----
-
-## Quick start (desktop)
-
-From the repo root:
-
-```bash
-# Windows
-.\run.ps1
-
-# Linux / macOS
-./run.sh
-```
-
-(`run.bat` also works on Windows.) This builds servd, binds it to your detected LAN address, and
-opens the dashboard in your browser. You'll see:
+On start, servd prints:
 
 ```
 servd v1.6.0 - local-network server tool
@@ -150,478 +85,320 @@ serving : https://10.205.210.12:8443   (share with other devices)
 cert    : self-signed, SHA-256 fingerprint:
           12:3A:07:38:...:F5:CF
 keystore: C:\Users\you\.servd\keystore.jks
-
-Press Ctrl+C to stop.
 ```
 
-The **admin** URL (`127.0.0.1`) is your own machine, where the host-only tabs (folder sharing,
-serve-site, ssh, ftp) appear; the **serving** URL is what you share. Your browser warns that the certificate isn't trusted - expected for a
-self-signed LAN cert. Confirm the fingerprint shown in the page matches the one printed above, then
-proceed.
+The **admin** URL is the host's own view, where the host-only tabs appear. The **serving** URL is
+the one you share.
 
-**Prefer `run.ps1` for a clean `Ctrl+C`.** `run.bat` works, but cmd.exe adds its own "Terminate
-batch job?" prompt after the server has already stopped.
+1. Put the other devices on the **same Wi-Fi**, or on the host's **hotspot**.
+2. On each device, open **`https://<serving-address>:8443`**, or scan the QR code in the dashboard.
+3. Accept the certificate warning once the fingerprint matches, then pick a display name. Each
+   device then appears in the **Devices** roster.
 
-### Connect another device
+### Android Host
 
-1. Put the other device on the **same Wi-Fi** (or connect it to this machine's **hotspot**).
-2. Open **`https://<the-serving-address>:8443`** in its browser.
-3. Accept the certificate warning, set a display name, and start chatting. Each connected device
-   appears in the **Devices** roster; the **drop files** tab does drag-n-drop to everyone. Or just
-   **scan the QR** in the left column to open the hub on a phone.
+1. Put the phone on the same Wi-Fi as the other devices, or turn on its hotspot.
+2. Open **servd** and tap **Start hub**. The screen shows the share URL, the QR code, the
+   fingerprint and the SSH/FTP credentials.
+3. Other devices open the URL and get the same dashboard as on desktop.
 
-> **On Linux/macOS, use `./run.sh` wherever this README shows `.\run.ps1`** - both take the same
-> servd flags and Gradle tasks.
->
-> **Why a runner instead of `gradlew` directly?** It launches the server as a direct JVM process
-> for a clean `Ctrl+C`, and on Windows it also applies a temp-dir workaround (not needed on
-> Linux/macOS). See [Troubleshooting](#troubleshooting). You can always call `./gradlew` yourself
-> instead.
+SSH/FTP start off. To enable them, open the **ssh** / **ftp** tabs from the dashboard on the
+phone's own `127.0.0.1`. The hub keeps running with a persistent notification; tap **Stop** there or
+in the app. To share phone storage in browse files, tap **Allow file browsing (storage access)** and
+grant all-files access. The folder picker then starts at Internal storage.
 
----
-
-## Android
-
-The Android app is a **full hub**, hosting the same stack as desktop. It is a thin native shell
-around the shared engine: a foreground service keeps the servers alive when the app is
-backgrounded, and a control screen starts/stops the hub and shows how to reach it.
-
-Build and install the debug APK:
-
-```bash
-.\run.ps1 :androidApp:assembleDebug
-adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk
-```
-
-Then, on the phone:
-
-1. Connect it to the **same Wi-Fi** as the other devices (or turn on its **hotspot** and have them
-   join it).
-2. Open **servd** and tap **Start hub**. The control screen shows the **share URL**, a
-   **scan-to-join QR**, the cert **fingerprint** to verify, and the **SSH/FTP credentials**.
-3. On another device, open the share URL (or scan the QR) and accept the certificate warning - the
-   same dashboard as desktop. SSH and FTP start off; enable them from the **ssh** / **ftp** tabs,
-   which appear when the phone opens the dashboard on its own `127.0.0.1`.
-
-The hub keeps running in the background with a persistent notification (tap **Stop** there or in the
-app to stop it).
-
----
-
-## Usage & configuration
-
-### The dashboard
-
-Everything is a **tab** in the served page. Client tabs are visible to everyone on the hub; **host
-tabs appear only on the host** (loopback), and each host tab carries a small dot that turns green
-when that feature is live.
+### Dashboard
 
 | Tab | Who sees it | What it does |
 |---|---|---|
-| **drop files** | everyone | drag-n-drop files that push to every connected device |
+| **drop files** | everyone | shared files pushed to every device |
 | **chat** | everyone | real-time chat |
-| **browse files** | host always; clients once a folder is shared | browse/download the shared host folder (left); the host picks the folder and toggles uploads (right) |
-| **serve site** | host only | re-serve a running web app to the LAN (reverse proxy) |
-| **ftp** | host only | toggle the FTPS server; shows its port + credentials |
-| **ssh** | host only | toggle the SSH/SFTP server; shows its port + credentials |
+| **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
+| **serve site** | host only | re-serve a running web app to the LAN |
+| **ftp** / **ssh** | host only | turn the server on or off; shows the port, password and connect command |
 
-The **left column** holds the connected-device roster and the scan-to-join QR, and - on the host - a
-**This host** card with the address, bound interface, and cert fingerprint.
+The left column has the device roster and QR code. On the host, it also has a **This host** card
+with the address, interface and fingerprint.
 
-### Default ports
+**Browse files:** on the host, pick a folder in the picker on the right; a whole drive works too.
+Tick **allow uploads** for read + write, then click **share this folder**. Use **stop sharing** to
+turn it off; you can switch folders anytime. Paths that try to leave the folder are refused.
 
-| Service | Port | Notes |
-|---|---|---|
-| HTTPS dashboard + chat + files | `8443` | always on |
-| SSH / SFTP | `2222` | optional, off until enabled from the **ssh** tab |
-| FTPS | `2121` | optional, off until enabled from the **ftp** tab |
-| Live-site proxy | `8080` | optional, only while a site is being served (configurable) |
+**Serve site:**
+1. Start your app as usual (e.g. `npm run dev` on `http://localhost:3000`).
+2. In the **serve site** tab, enter that target and a port (default `8080`), then click
+   **serve this site**.
+3. Everyone opens `https://<serving-address>:8080/`.
 
-All are non-privileged ports. SSH/FTP share one generated credential (username `servd`), shown in
-the **ssh** and **ftp** tabs.
+The app is served at the root, so SPA routes and absolute asset paths keep working. servd adds TLS,
+so even an HTTP-only or localhost-only app is reachable and encrypted across the LAN.
 
-### Desktop CLI
+### Ports & Data Directory
 
-The runner passes servd flags straight through:
+| Port | Service |
+|---|---|
+| `8443` | dashboard, chat, files (always on) |
+| `2222` | SSH/SFTP (off until enabled) |
+| `2121` | FTPS (off until enabled) |
+| `8080` | serve site (only while serving; configurable) |
+
+All ports are non-privileged. SSH and FTP share one generated credential, username `servd`. Data
+(keystore, shared files, credential) lives in `~/.servd` on desktop, and in the app's private
+storage on Android.
+
+### Command-Line Options
 
 ```bash
-.\run.ps1 --port 9443 --no-open
+servd [start] [flags]     # start the hub
+servd discover            # find hubs on the network without typing an IP
 ```
 
 | Flag | Meaning | Default |
 |---|---|---|
 | `--port N` | HTTPS port | `8443` |
-| `--host IP` | Bind address | detected LAN IP (else `127.0.0.1`) |
-| `--dir PATH` | Data dir (keystore, files, credential) | `~/.servd` |
-| `--no-open` | Don't auto-open the browser | (opens) |
-| `--browse-dir PATH` | Serve this folder to clients on start (see [Browse files](#browse-files-serve-a-host-folder)) | (off) |
-| `--browse-write` | Allow uploads into the browsed folder | read-only |
-| `--proxy-target URL` | Re-serve a running site to the LAN (see [Serve site](#serve-site-a-running-web-app)) | (off) |
-| `--proxy-port N` | Port the reverse proxy listens on | `8080` |
+| `--host IP` | bind address | detected LAN IP, else `127.0.0.1` |
+| `--dir PATH` | data dir | `~/.servd` |
+| `--no-open` | don't open the browser | opens |
+| `--browse-dir PATH` | share a folder on start | off |
+| `--browse-write` | allow uploads to that folder | read-only |
+| `--proxy-target URL` | serve a running site on start | off |
+| `--proxy-port N` | serve-site port | `8080` |
 
-Find running hubs on the network without typing an IP:
+## Security
 
-```bash
-.\run.ps1 discover
-```
-
-Any Gradle task passes through too, e.g. `.\run.ps1 :core:desktopTest`.
-
-### Data directory
-
-On desktop, servd keeps its TLS keystore, the shared files, and the SSH/FTP credential under
-`~/.servd` (override with `--dir`). On Android the equivalent lives in the app's private storage.
-
-### Browse files (serve a host folder)
-
-Beyond the shared **drop files** box, the host can expose a **real directory** on its device for
-clients to browse - list folders, traverse, and download, with optional uploads. It lives in the
-**browse files** tab and is **off by default**:
-
-1. Open the dashboard on the host (`127.0.0.1`) and go to **browse files**. The tab splits into the
-   folder browser (left) and the host-only sharing controls (right).
-2. On the right, navigate the built-in picker to a folder (a whole drive works too), tick
-   **allow uploads** for read + write (or leave it for read-only), then **share this folder**. The
-   left side now browses that folder; **stop sharing** turns it off, and you can switch folders any
-   time. Clients only ever see the left browser, and only once a folder is shared.
-
-On desktop you can also start it straight from the CLI with `--browse-dir PATH` (add `--browse-write`
-to permit uploads). On **Android**, browsing the phone's storage needs **all-files access** - tap
-**Allow file browsing (storage access)** on the control screen and grant it in system settings; the
-picker then starts at **Internal storage**. Everything served is **jailed to the chosen folder** -
-paths that try to escape it are refused.
-
-### Serve site (a running web app)
-
-Point servd at a web server you're already running and it **re-serves that app to the whole LAN**
-over its own HTTPS - a local, LAN-only tunnel. Works with any HTTP/HTTPS backend (a Node/Vite dev
-server, a static host, another service), and proxies **WebSockets** too, so dev-server HMR /
-live-reload keeps working. Off by default, host-only:
-
-1. Start your app however you normally do (e.g. `npm run dev` on `http://localhost:3000`).
-2. Open the dashboard on the host (`127.0.0.1`) and, in the **serve site** tab, enter the target
-   (`http://localhost:3000`) and a port to serve on (default `8080`), then **serve this site**.
-3. Everyone opens **`https://<the-serving-address>:8080/`** - the app is served at the root, so SPA
-   routes and absolute asset paths work unchanged. **stop** turns it off; you can switch targets
-   anytime.
-
-From the CLI, start it with the hub: `--proxy-target http://localhost:3000 [--proxy-port 8080]`.
-It runs on a **dedicated port** (not the `8443` dashboard) and terminates TLS with servd's
-self-signed cert, so an http-only or localhost-only app becomes reachable - and encrypted - across
-the network.
-
----
-
-## Security model
-
-servd is built for a **trusted LAN**, and its boundaries are deliberate:
+servd is built for a **trusted LAN**, and these limits are deliberate:
 
 - **Client routes** (dashboard, chat, files, roster) are bound to the LAN interface and open to the
-  network - anyone who can reach the hub and accept the cert can use them. There is **no PIN**; that
-  is the intended model for a local tool.
-- **Admin routes** (service toggles, host info, cert) are gated to **loopback only**. Only a browser
-  on the host device itself can administer the hub; other devices on the LAN cannot.
-- **SSH and FTP** require the generated credential - never anonymous. FTP is FTPS (explicit TLS),
-  SFTP is encrypted by design, and both are **jailed to the shared files directory** (no OS shell,
-  no access outside that folder).
-- **Browse files** (serving a host folder) is **off by default**, configured only from the host
-  (loopback), and **jailed to the chosen folder** - clients cannot traverse above it, and uploads
-  are refused unless the host enabled them.
-- **Serve site** (the reverse proxy) is **off by default** and configured only from the host
-  (loopback). While on, it exposes whatever app the host targeted to the LAN with no auth (same
-  trusted-LAN model), on its own port; stopping it closes that port.
-- **Transport is encrypted** end to end on the wire (HTTPS/WSS, SSH, FTPS), verified by the cert
-  **fingerprint** rather than a CA. This is **transport encryption, not end-to-end**: the host
-  device (the server) can see traffic, as expected for a hub.
+  network, with no PIN or account. Anyone who can reach the hub and accepts the certificate can use
+  them.
+- **Admin routes** (`/admin/*`: service toggles, host info, certificate, folder and proxy setup)
+  answer only on **loopback**. Only the host device can change settings.
+- **SSH/FTP** always require the password; there's no anonymous login. FTP uses explicit TLS
+  (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
+- **Browse files** is off by default and set up only from the host. Clients can't go above the
+  chosen folder, and uploads are refused unless the host allows them.
+- **Serve site** is off by default and set up only from the host. While it's on, the target app is
+  open to the LAN without a login, on its own port. Stopping it closes that port.
+- **Encryption** covers the network hop, checked by fingerprint. It is **not end to end**: the
+  host can see the traffic, as expected for a hub.
 
----
+## Architecture
 
-## Packaging
-
-Build distributable bundles - a self-contained desktop app and the Android APKs - into a `dist/`
-folder.
-
-### One-shot: `package.ps1` / `package.sh`
-
-```bash
-# Windows
-.\package.ps1
-
-# Linux / macOS
-./package.sh
+```
+servd/
+├─ core/            Kotlin Multiplatform engine shared by desktop + Android
+│   ├─ commonMain     protocol models, PeerRegistry, LAN-address selection, Service model
+│   ├─ jvmSharedMain  Ktor server, TLS, chat hub, file store, folder browser, proxy, QR, SSH, FTP
+│   ├─ desktopMain    JmDNS discovery
+│   ├─ androidMain    Android glue
+│   └─ resources/webui  the dashboard (one HTML/CSS/JS file)
+├─ desktopHost/     the CLI that starts the hub (Netty engine)
+├─ androidApp/      foreground service + native control screen
+├─ run.ps1 / run.bat / run.sh   run from source (Windows / Windows / Linux-macOS)
+├─ package.ps1 / package.sh     build distributables into dist/
+└─ gradlew*         Gradle wrapper
 ```
 
-Builds the desktop **app image** (bundled JRE) and the Android **debug APK**, plus the signed
-**release APK** if release signing is set up (below), all in `dist/`:
+- **`jvmSharedMain`**: Android and desktop both run on the JVM, but Kotlin Multiplatform has no
+  shared "android + jvm" source set. Both `androidMain` and `desktopMain` depend on this
+  intermediate source set, so the server code lives in one place.
+- **One HTTP engine**: `ServdServer` holds all routing and TLS setup and takes the engine as a
+  parameter. Both platforms pass **Netty**, because Ktor's CIO engine can't serve HTTPS. The
+  keystore is **PKCS12**, because Android has no JKS provider.
+- **Key abstractions** (`commonMain`):
+  - `Service` is a startable/stoppable server with an id, port and state. Implementations:
+    `HttpService` (always on), `SshService` and `FtpService`.
+  - `ServiceManager` starts, stops and toggles services, one call at a time.
+  - `ChatHub` tracks who's connected and broadcasts chat, join/leave and roster events.
+- **Request flow**:
+
+  | Area | Routes |
+  |---|---|
+  | Dashboard | `GET /` |
+  | Host status | `GET /status`: host info + fingerprint |
+  | Chat | WebSocket `/ws`: announce a name, then chat |
+  | Drop files | `POST /files` upload · `GET /files` list · `GET /files/{id}` · `GET /files/zip` · delete/clear |
+  | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
+  | Live site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
+  | Admin (loopback only) | `/admin/*`, incl. `/admin/browse*` and `/admin/proxy` |
+
+- **Out of scope**: Bluetooth (Wi-Fi/hotspot only), a native Compose UI, end-to-end encryption,
+  scanning the whole LAN (the roster is the hub's peers plus mDNS hub discovery), and an external
+  database. State is kept in memory.
+
+## Tech Stack
+
+Exact versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+
+| Area | Component | Version | Role |
+|---|---|---|---|
+| Language | Kotlin Multiplatform | `2.1.0` | shared `core` for desktop JVM + Android |
+| Build | Gradle (Kotlin DSL) | `8.11.1` | wrapper committed |
+| Build | Android Gradle Plugin | `8.7.3` | Android build (`multiDexEnabled` for Netty) |
+| Runtime | JDK | 17 target | Java 17 bytecode, built with JDK 21 |
+| Android | SDK | compile/target 35, min 24 | |
+| Server | Ktor + Netty | `3.0.3` | HTTPS + WebSocket; Netty is the engine on both platforms |
+| Proxy | Ktor client (CIO) | `3.0.3` | outbound HTTP + WebSocket forwarding |
+| TLS | JSSE / PKCS12 | JDK | self-signed keystore, SHA-256 fingerprint |
+| Net | `java.net.NetworkInterface` | JDK | LAN/hotspot address detection |
+| SSH | Apache MINA SSHD | `2.13.2` | SSH/SFTP server |
+| FTP | Apache FtpServer | `1.2.0` | FTPS server |
+| Discovery | JmDNS / `NsdManager` (Android) | `3.5.9` | mDNS/DNS-SD |
+| QR | ZXing | `3.5.3` | scan-to-join QR |
+| Data | kotlinx.serialization | `1.7.3` | JSON WebSocket protocol |
+| Async | kotlinx.coroutines | `1.9.0` | async server + guarded broadcast |
+| Logging | SLF4J + slf4j-simple | `2.0.16` | desktop logging |
+| Frontend | plain HTML/CSS/JS | | single-file dashboard, no framework |
+
+## Development
+
+### Prerequisites
+
+- **JDK 17+** (JDK 21 is fine). No Gradle install is needed; the repo has the wrapper.
+- **Android SDK** for the app. Point `local.properties` at it, e.g. `sdk.dir=C:\\Android`.
+- **Internet** for the first build only. Running servd needs only a JVM (packaged builds bundle
+  one) and a Wi-Fi or hotspot network, with or without internet.
+
+### Running from Source
+
+```bash
+.\run.ps1                          # Windows (run.bat also works)
+```
+```bash
+./run.sh                           # Linux / macOS
+```
+
+These build servd, bind it to your LAN address, and open the dashboard. Both take servd flags
+(`.\run.ps1 --port 9443 --no-open`) or any Gradle task (`.\run.ps1 :core:desktopTest`). On
+Linux/macOS, use `./run.sh` wherever this README shows `.\run.ps1`.
+
+Why a runner instead of `gradlew`? It runs the server as a direct JVM process, so Ctrl+C is clean.
+On Windows it also applies the temp-dir workaround (see Troubleshooting). Prefer `run.ps1` over
+`run.bat`, because cmd.exe adds a "Terminate batch job?" prompt after the server has stopped.
+
+### Building & Testing
+
+```bash
+.\run.ps1 :core:desktopTest            # unit tests: LAN-address selection, chat hub, protocol
+.\run.ps1 :desktopHost:installDist     # desktop distribution
+.\run.ps1 :androidApp:assembleDebug    # debug APK
+```
+
+Unit tests cover the pure logic with `kotlin-test`. Networked features are checked with a two-client
+WSS harness and `curl` smoke checks. The Android build is checked on a Pixel emulator via `adb`.
+
+### Android Builds
+
+Build the debug APK, then install it on a USB-connected phone (with USB debugging on):
+
+```bash
+.\run.ps1 :androidApp:assembleDebug
+```
+```bash
+adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk
+```
+
+APKs land in `androidApp/build/outputs/apk/debug/` and `androidApp/build/outputs/apk/release/`.
+The debug build needs no keystore.
+
+### Packaging
+
+```bash
+.\package.ps1                      # Windows
+```
+```bash
+./package.sh                       # Linux / macOS (-h for help)
+```
+
+This builds the desktop app image (with a bundled JRE) and the debug APK. It also builds the signed
+release APK if signing is set up. Everything goes into `dist/`:
 
 ```
 dist/
-├─ servd-<version>-windows.zip           self-contained desktop app (Windows)
-├─ servd-<version>-linux-x86_64.tar.gz   self-contained desktop app (Linux/macOS)
+├─ servd-<version>-windows.zip           desktop app (Windows)
+├─ servd-<version>-linux-x86_64.tar.gz   desktop app (Linux/macOS)
 ├─ servd-<version>-debug.apk             Android debug build
 └─ servd-<version>-release.apk           Android release build (only if signed)
 ```
 
-| `package.ps1` flag | `package.sh` flag | Effect |
+| `package.ps1` | `package.sh` | Effect |
 |---|---|---|
-| _(none)_ | _(none)_ | desktop app image + Android APK(s) |
-| `-Installer` | `--installer` | also build the OS-native installer (`.msi`/`.dmg`/`.deb`) |
-| - | `--appimage` | also build a single-file `*.AppImage` (Linux; needs `appimagetool`) |
-| `-Desktop` | `--desktop` | desktop only |
-| `-Android` | `--android` | Android only |
+| `-Desktop` / `-Android` | `--desktop` / `--android` | build one platform only |
+| `-Installer` | `--installer` | also build the native installer (`.msi` / `.dmg` / `.deb`) |
+| | `--appimage` | also build a single-file `<arch>.AppImage` (needs [`appimagetool`](https://appimage.github.io/appimagetool/)) |
 | `-Clean` | `--clean` | wipe `dist/` first |
 
-`package.sh` also takes `-h` / `--help` to print its usage. The Gradle tasks these scripts wrap are
-below, if you'd rather run them directly.
+The scripts wrap two Gradle tasks:
+- `:desktopHost:jpackageImage` builds a self-contained folder, `desktopHost/build/jpackage/servd/`
+  (about 166 MB). Its launcher is `servd\servd.exe` on Windows and `servd/bin/servd` on
+  Linux/macOS. It opens a console showing the URL and fingerprint; press Ctrl+C or close it to stop.
+- `:desktopHost:jpackageInstaller` builds `.msi` (needs [WiX](https://wixtoolset.org/) on
+  `PATH`), `.dmg` or `.deb`.
 
-### Desktop app image & installer
+jpackage builds only for the OS it runs on, so build each platform on that platform.
 
-servd bundles its own JRE via **jpackage**, so an end user installs nothing else.
+### Android Signing
 
-```bash
-# Windows                                    # Linux / macOS
-.\run.ps1 :desktopHost:jpackageImage         ./run.sh :desktopHost:jpackageImage      # self-contained folder
-.\run.ps1 :desktopHost:jpackageInstaller     ./run.sh :desktopHost:jpackageInstaller  # native installer
-```
-
-`jpackageImage` writes a self-contained folder to `desktopHost/build/jpackage/servd/` (~166 MB with
-the bundled runtime). The launcher inside is the **click-to-run executable**, the equivalent of a
-Windows `.exe`:
-
-- **Windows:** `servd\servd.exe`
-- **Linux / macOS:** `servd/bin/servd`
-
-It opens a console showing the hub URL and cert fingerprint; **press `Ctrl+C` or close it to stop
-the hub.** `jpackageInstaller` builds `.msi` on Windows (needs the
-[WiX Toolset](https://wixtoolset.org/) on `PATH`), `.dmg` on macOS, `.deb` on Linux. **jpackage is
-per-OS - build each artifact on its own platform.**
-
-**Single-file Linux executable (AppImage).** For one portable file you `chmod +x` and double-click
-(the closest match to a Windows `.exe`), build an AppImage:
+Create a keystore once. Reuse it for every release so updates install over the previous version.
+`keytool` ships with the JDK:
 
 ```bash
-./package.sh --appimage
+keytool -genkeypair -v -keystore servd-release.jks -alias servd -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-It wraps the app image into `dist/servd-<version>-<arch>.AppImage`, already marked executable. This
-needs [`appimagetool`](https://appimage.github.io/appimagetool/) on `PATH`; without it the step is
-skipped with a note.
+- **Local:** create a git-ignored `androidApp/keystore.properties`:
 
-### Android signed release APK
+  ```properties
+  storeFile=androidApp/servd-release.jks
+  storePassword=your-store-password
+  keyAlias=servd
+  keyPassword=your-key-password
+  ```
 
-Release signing reads from an **untracked** `androidApp/keystore.properties`, so no secret is
-committed. Generate a keystore once:
+  Then run `.\run.ps1 :androidApp:assembleRelease`. Without this file, the APK is built unsigned.
+
+- **CI:** add these repo secrets under **Settings → Secrets and variables → Actions**:
+
+  | Secret | Value |
+  |---|---|
+  | `ANDROID_KEYSTORE_BASE64` | the keystore, base64-encoded |
+  | `ANDROID_STORE_PASSWORD` | store password |
+  | `ANDROID_KEY_ALIAS` | key alias, e.g. `servd` |
+  | `ANDROID_KEY_PASSWORD` | key password |
+
+  To base64-encode the keystore, run `base64 -w0 servd-release.jks`, or in PowerShell
+  `[Convert]::ToBase64String([IO.File]::ReadAllBytes("servd-release.jks"))`.
+
+### Releasing
+
+1. Set `servdVersion` in [`gradle.properties`](gradle.properties) and `Servd.VERSION`
+   (`core/.../Servd.kt`) to the same version. CI fails if they differ.
+2. Commit, then tag `v<servdVersion>` and push:
 
 ```bash
-keytool -genkeypair -v -keystore androidApp/servd-release.jks -alias servd \
-  -keyalg RSA -keysize 2048 -validity 10000
+git tag v1.6.0 && git push origin v1.6.0
 ```
 
-Create `androidApp/keystore.properties` (git-ignored) pointing at it:
+[`release.yml`](.github/workflows/release.yml) checks that the tag matches the version. It then
+builds the Windows `.zip` (`servd.exe` + JRE), the Linux `.AppImage` and the signed `.apk`, each on
+its own OS runner. Finally it publishes a GitHub release with auto-generated notes.
 
-```properties
-storeFile=androidApp/servd-release.jks
-storePassword=your-store-password
-keyAlias=servd
-keyPassword=your-key-password
-```
+### Troubleshooting
 
-Then build:
-
-```bash
-.\run.ps1 :androidApp:assembleRelease
-```
-
-The signed APK lands at `androidApp/build/outputs/apk/release/androidApp-release.apk`. Without a
-`keystore.properties`, `assembleRelease` still builds but leaves the APK unsigned. The debug build
-(`assembleDebug`) needs no keystore.
-
----
-
-## Releases
-
-Tagged releases are built and published automatically by GitHub Actions
-([`.github/workflows/release.yml`](.github/workflows/release.yml)). Because jpackage is per-OS,
-each artifact is built on its native runner, then all are attached to a GitHub Release for the tag:
-
-- **Windows** - `.zip` (contains `servd.exe` + bundled JRE)
-- **Linux** - single-file `.AppImage`
-- **Android** - signed release `.apk`
-
-### Cut a release
-
-1. Bump the version in one place - `servdVersion` in [`gradle.properties`](gradle.properties) - and
-   the matching `Servd.VERSION` constant in `core/.../Servd.kt` (CI fails if the two disagree).
-2. Commit, then tag and push. The tag must be `v<servdVersion>`:
-
-   ```bash
-   git tag v1.6.0
-   git push origin v1.6.0
-   ```
-
-CI verifies the tag matches the version, builds all three artifacts, and publishes the release with
-auto-generated notes. (You can also build locally any time with
-[`package.ps1` / `package.sh`](#packaging).)
-
-### Android signing secrets
-
-The signed release APK needs your keystore, stored as encrypted repository secrets
-(**Settings -> Secrets and variables -> Actions**). Generate a keystore once and keep it safe -
-reuse it for every release so updates install over the previous version:
-
-```bash
-keytool -genkeypair -v -keystore servd-release.jks -alias servd \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
-
-> `keytool` ships with the JDK. If your shell can't find it (common in Git Bash on Windows, where
-> `java` is an Oracle shim without the JDK tools), call it by full path, e.g.
-> `"/c/Program Files/Java/jdk-21/bin/keytool" ...`, or add the JDK's `bin` to your `PATH`.
-
-Then add these four secrets:
-
-| Secret | Value |
-|---|---|
-| `ANDROID_KEYSTORE_BASE64` | the keystore, base64-encoded |
-| `ANDROID_STORE_PASSWORD` | keystore (store) password |
-| `ANDROID_KEY_ALIAS` | key alias (e.g. `servd`) |
-| `ANDROID_KEY_PASSWORD` | key password |
-
-Base64-encode the keystore with `base64 -w0 servd-release.jks` (Linux/macOS/Git Bash) or, in
-PowerShell, `[Convert]::ToBase64String([IO.File]::ReadAllBytes("servd-release.jks"))`.
-
----
-
-## Architecture
-
-### Modules
-
-```
-servd/
-├─ core/         Kotlin Multiplatform library - the engine (shared by desktop + Android)
-│   ├─ commonMain      protocol models, PeerRegistry, LAN-address selection, Service model
-│   ├─ jvmSharedMain   Ktor server, TLS, chat hub, file store, directory browser, live-site proxy, QR, SSH + FTP
-│   ├─ desktopMain     desktop-only: JmDNS discovery
-│   ├─ androidMain     Android glue
-│   └─ .../resources/webui   the served dashboard (single HTML/CSS/JS file)
-├─ desktopHost/  JVM app - the CLI that starts the server (Netty engine)
-├─ androidApp/   Android host - foreground service + native control screen
-├─ run.ps1 / run.bat   run servd on Windows (temp-dir workaround; run.ps1 = clean Ctrl+C)
-├─ run.sh              run servd on Linux / macOS
-├─ package.ps1 / package.sh   build distributable bundles into dist/ (Windows / Linux-macOS)
-└─ gradlew*            Gradle wrapper (no separate Gradle install needed)
-```
-
-**Shared JVM source set.** Android and desktop are both JVM, but Kotlin Multiplatform's default
-hierarchy has no shared "android + jvm" source set. servd adds an intermediate **`jvmSharedMain`**
-that both `androidMain` and `desktopMain` depend on, so the plain-JVM server code (Ktor server, TLS,
-SSH, FTP) lives there once and runs on both platforms.
-
-**One HTTP engine.** `ServdServer` holds all routing and TLS wiring and is generic over the Ktor
-engine factory; each platform injects the engine. Both desktop and Android use **Netty** (Ktor's
-CIO engine cannot serve HTTPS). The keystore is persisted as **PKCS12** because Android has no JKS
-provider.
-
-### Key abstractions (`commonMain`)
-
-- **`Service`** - a startable/stoppable server with an `id`, `port`, and state. Implementations:
-  `HttpService` (always on), `SshService`, `FtpService`.
-- **`ServiceManager`** - starts/stops/toggles services and serializes those calls.
-- **`ChatHub`** - tracks connected peers (presence) and broadcasts chat and roster events.
-
-### Request flow
-
-- **Dashboard & status:** `GET /` serves the single-page dashboard; `GET /status` returns host
-  info + the cert fingerprint as JSON.
-- **Chat & presence:** clients connect to the `/ws` WebSocket, announce a name, then exchange chat;
-  `ChatHub` broadcasts join/leave and messages.
-- **Files:** `POST /files` (multipart upload), `GET /files` (list), `GET /files/{id}` (download),
-  with delete/clear routes.
-- **File browsing:** `GET /fs/list` + `GET /fs/file` list and download a host-served folder, and
-  `POST /fs/upload` when writable; the host configures the served root via loopback `/admin/browse*`.
-- **Live site:** a separate HTTPS listener (its own port) forwards all requests and WebSocket
-  upgrades to the host-set target; configured via loopback `/admin/proxy`.
-- **Admin:** `/admin/*` routes report and toggle services, gated to loopback.
-
-### Deliberately out of scope
-
-- **Bluetooth** (Wi-Fi/hotspot + LAN only).
-- **Native Compose UI** (the served web dashboard is the UI).
-- **True end-to-end encryption** (transport encryption only; the host can see traffic).
-- **Full LAN device scanning** (the roster is peers connected to the hub, plus mDNS hub discovery).
-- **External database** (state is in-memory).
-
----
-
-## Building & testing
-
-The wrappers set up a temp-dir workaround (see [Troubleshooting](#troubleshooting)) and pass any
-Gradle task through:
-
-```bash
-.\run.ps1 :core:desktopTest        # unit tests (LAN-address selection, chat hub, protocol)
-.\run.ps1 :desktopHost:installDist # build the desktop distribution
-.\run.ps1 :androidApp:assembleDebug
-```
-
-Tests cover the pure logic with `kotlin-test`; networked features are verified with a
-dependency-free two-client WSS harness and `curl` smoke checks, and the Android build is verified on
-a Pixel emulator via `adb`.
-
----
-
-## Troubleshooting
-
-**`Unable to establish loopback connection` when building or running.** JDK 21's NIO creates an
-AF_UNIX socket for its internal pipe in the OS temp dir, and some Windows temp folders (e.g.
-`%LOCALAPPDATA%\Temp` under certain AV/EDR setups) reject socket files, which breaks Gradle and the
-server. The fix - already built into `run.ps1` / `run.bat` - points `TMP`/`TEMP` at a repo-local
-`.sock-tmp/` folder first. If you invoke `gradlew` directly, set them yourself:
-
-```bash
-set TMP=%CD%\.sock-tmp && set TEMP=%CD%\.sock-tmp && gradlew :desktopHost:run
-```
-
-**Browser says "Not secure / certificate invalid."** Expected - servd uses a self-signed cert
-because a LAN has no certificate authority. Verify the fingerprint in the page matches the one the
-CLI (or the Android control screen) shows, then proceed.
-
-**No LAN address found.** Connect to Wi-Fi or start a hotspot, then restart servd. Without one it
-binds to `127.0.0.1`, reachable only from the same machine.
-
-**`Ctrl+C` prints a wall of `RejectedExecutionException`.** Harmless shutdown noise from in-flight
-HTTP/2 frames racing the event loop; the server stops cleanly regardless. servd silences it, so if
-you see it you're on an old build - rebuild.
-
----
-
-## Tech stack & versions
-
-Dependency versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
-
-| Area | Component | Version | Role |
-|---|---|---|---|
-| Language | Kotlin (Multiplatform) | `2.1.0` | one shared `core` for desktop JVM + Android |
-| Build | Gradle (Kotlin DSL) | `8.11.1` | wrapper committed; no separate install |
-| Build | Android Gradle Plugin | `8.7.3` | Android build (`multiDexEnabled` for Netty) |
-| Runtime | JDK | 17 target | Java 17 bytecode (built with JDK 21) |
-| Android | SDK levels | compile 35 / min 24 / target 35 | |
-| Server | Ktor | `3.0.3` | HTTP/S + WebSocket framework |
-| Server | Netty (via Ktor) | | HTTPS engine on desktop **and** Android |
-| Proxy | Ktor client (CIO) | `3.0.3` | outbound HTTP + WebSocket forwarding for the live-site proxy |
-| TLS | JSSE / PKCS12 | JDK | self-signed keystore; SHA-256 fingerprint |
-| Net | `java.net.NetworkInterface` | JDK | cross-platform LAN/hotspot address detection |
-| SSH | Apache MINA SSHD | `2.13.2` | SSH / SFTP server |
-| FTP | Apache FtpServer | `1.2.0` | FTPS server |
-| Discovery | JmDNS (desktop) / `NsdManager` (Android) | `3.5.9` | mDNS/DNS-SD |
-| QR | ZXing | `3.5.3` | scan-to-join QR |
-| Data | kotlinx.serialization | `1.7.3` | JSON WebSocket protocol |
-| Async | kotlinx.coroutines | `1.9.0` | async server + guarded broadcast |
-| Logging | SLF4J + slf4j-simple | `2.0.16` | desktop server logging |
-| Frontend | plain HTML/CSS/JS | | single-file dashboard, no framework |
-
----
+- **`Unable to establish loopback connection`**: JDK 21's NIO creates a socket file in the temp
+  dir, and some Windows temp folders reject it (e.g. under some AV/EDR setups). `run.ps1` /
+  `run.bat` already point `TMP`/`TEMP` at `.sock-tmp/`. If you call `gradlew` directly, set them
+  yourself first:
+  `set TMP=%CD%\.sock-tmp && set TEMP=%CD%\.sock-tmp && gradlew :desktopHost:run`
+- **"Not secure / certificate invalid"**: expected with a self-signed certificate. Check that the
+  fingerprint matches the one from the CLI or the Android screen, then proceed.
+- **No LAN address found**: join Wi-Fi or start a hotspot, then restart. Otherwise servd binds to
+  `127.0.0.1` only.
+- **Ctrl+C prints `RejectedExecutionException`**: harmless shutdown noise from an old build.
+  Rebuild.
+- **`keytool` not found** (common in Git Bash): call it from the JDK's `bin` folder, e.g.
+  `"/c/Program Files/Java/jdk-21/bin/keytool"`.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
