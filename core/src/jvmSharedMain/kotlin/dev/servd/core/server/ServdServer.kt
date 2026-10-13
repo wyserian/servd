@@ -282,6 +282,32 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 )
                 call.respondFile(f)
             }
+            // A folder (recursively) as one streamed zip. Unreadable files are skipped rather
+            // than failing the whole download.
+            get("/fs/zip") {
+                if (!browser.enabled) return@get call.respond(HttpStatusCode.NotFound)
+                val (dir, files) = browser.filesUnder(call.request.queryParameters["path"] ?: "")
+                    ?: return@get call.respond(HttpStatusCode.NotFound)
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    ContentDisposition.Attachment
+                        .withParameter(ContentDisposition.Parameters.FileName, dir.name.ifBlank { "servd-share" } + ".zip")
+                        .toString(),
+                )
+                call.respondOutputStream(ContentType.Application.Zip) {
+                    ZipOutputStream(this).use { zip ->
+                        zip.setLevel(Deflater.BEST_SPEED)
+                        for ((path, file) in files) {
+                            val input = runCatching { file.inputStream() }.getOrNull() ?: continue
+                            input.use {
+                                zip.putNextEntry(ZipEntry(path))
+                                it.copyTo(zip)
+                                zip.closeEntry()
+                            }
+                        }
+                    }
+                }
+            }
             post("/fs/upload") {
                 if (!browser.enabled) return@post call.respond(HttpStatusCode.NotFound)
                 if (!browser.writable) return@post call.respond(HttpStatusCode.Forbidden)

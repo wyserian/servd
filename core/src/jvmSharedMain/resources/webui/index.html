@@ -398,6 +398,7 @@
               <div class="browse-bar">
                 <span class="nav-btns"><button class="mini-btn" id="brRoot" type="button" title="Root folder">root</button><button class="mini-btn" id="brUp" type="button" title="Up one level">up</button></span>
                 <span class="brpath" id="brPath">/</span>
+                <button class="mini-btn" id="brDlAll" type="button" title="Download this folder as one zip" disabled>download all</button>
                 <button type="button" class="icon-btn" id="brAttach" title="Upload to this folder" style="display:none">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
                 </button>
@@ -733,10 +734,11 @@
   // Render the left (browse) pane of the sharing tab: the shared folder, or a hint when off.
   function showBrowsePane(){
     if(brEnabled) openBrowse(brCur);
-    else $("brList").innerHTML='<div class="files-empty">Nothing shared yet'+(hostMode?' - pick a folder on the right to start.':'.')+'</div>';
+    else { $("brList").innerHTML='<div class="files-empty">Nothing shared yet'+(hostMode?' - pick a folder on the right to start.':'.')+'</div>'; $("brDlAll").disabled=true; }
   }
   function openBrowse(path){
     brCur = path||"";
+    $("brDlAll").disabled = true; // until the listing shows there is something to zip
     $("brList").innerHTML='<div class="files-empty">Loading&hellip;</div>';
     fetch("/fs/list?path="+encodeURIComponent(brCur)).then(r=>{ if(!r.ok) throw 0; return r.json(); })
       .then(renderBrowse).catch(()=>{
@@ -753,6 +755,7 @@
     $("brRoot").style.visibility = brCur ? "" : "hidden";
     $("brAttach").style.display = brWritable ? "" : "none";
     const el=$("brList"); el.innerHTML="";
+    $("brDlAll").disabled = !l.entries.length;
     if(!l.entries.length){ el.innerHTML='<div class="files-empty">Empty folder.</div>'; return; }
     for(const e of l.entries){
       const child = brCur ? brCur+"/"+e.name : e.name;
@@ -769,6 +772,13 @@
   }
   $("brUp").addEventListener("click",()=>openBrowse(brCur.replace(/\/?[^/]*$/,"")));
   $("brRoot").addEventListener("click",()=>openBrowse(""));
+  // Download all: the current folder (and everything under it) streamed as one zip.
+  $("brDlAll").addEventListener("click",()=>{
+    const b=$("brDlAll"); if(b.disabled) return;
+    window.location.href="/fs/zip?path="+encodeURIComponent(brCur);
+    b.textContent="downloading…"; b.disabled=true;
+    setTimeout(()=>{ b.textContent="download all"; b.disabled = !$("brList").querySelector(".frow"); }, 1500);
+  });
   $("brAttach").addEventListener("click",()=>$("brFileInput").click());
   $("brFileInput").addEventListener("change",()=>{ if($("brFileInput").files.length){ browseUpload($("brFileInput").files); $("brFileInput").value=""; } });
   function browseUpload(fileList){

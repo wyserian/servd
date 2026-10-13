@@ -86,6 +86,23 @@ class Browser {
     /** The backing file for a download, or null if it is not a readable file inside the root. */
     fun download(rel: String): File? = resolve(rel)?.takeIf { it.isFile }
 
+    /**
+     * Every file under directory [rel], recursively, paired with its path relative to that
+     * directory (for a zip). Null if [rel] is not a directory. Links leading outside the root,
+     * or back into a folder already walked, are skipped. Lazy, so huge trees stream.
+     */
+    fun filesUnder(rel: String): Pair<File, Sequence<Pair<String, File>>>? {
+        val base = rootDir ?: return null
+        val dir = resolve(rel)?.takeIf { it.isDirectory } ?: return null
+        fun inside(f: File) = f.path == base.path || f.path.startsWith(base.path + File.separator)
+        val seen = HashSet<String>()
+        val files = dir.walkTopDown()
+            .onEnter { d -> d.canonicalFile.let { inside(it) && seen.add(it.path) } }
+            .filter { it.isFile && inside(it.canonicalFile) }
+            .map { it.relativeTo(dir).invariantSeparatorsPath to it }
+        return dir to files
+    }
+
     /** Save [input] as [name] inside directory [rel]. Returns false if not writable / bad path. */
     fun upload(rel: String, name: String, input: InputStream): Boolean {
         val base = rootDir ?: return false
