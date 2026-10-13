@@ -74,9 +74,8 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     @Volatile private var currentPort: Int = 0
 
     /**
-     * For a `localhost` target: the loopback origin that actually answered (`127.0.0.1` or
-     * `[::1]`). Dev servers like Vite bind `localhost` to IPv6 only, while the JVM resolves it to
-     * IPv4 first - so we probe both and cache the one that works. Cleared on any upstream failure.
+     * For a `localhost` target: the loopback origin that actually answered (see [loopbackOrigin]),
+     * cached so the probe runs once. Cleared on any upstream failure.
      */
     @Volatile private var resolvedOrigin: String? = null
 
@@ -220,28 +219,18 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     }
 
     /**
-     * Where to actually connect for [target]. Non-localhost targets are used as-is. For `localhost`
-     * we probe `127.0.0.1` then `[::1]` (cached once one answers), since dev servers often listen
-     * on only one of them. Falls back to [target] if neither answers, so the error stays readable.
+     * Where to actually connect for [target]: the cached or freshly probed loopback origin for a
+     * `localhost` target (see [loopbackOrigin]), else [target] itself - so a failure stays readable.
      */
-    private suspend fun upstreamOrigin(target: String): String {
-        val uri = runCatching { URI(target) }.getOrNull() ?: return target
-        if (!uri.host.equals("localhost", ignoreCase = true)) return target
-        resolvedOrigin?.let { return it }
-        val port = if (uri.port > 0) uri.port else if (uri.scheme == "https") 443 else 80
-        val found = withContext(Dispatchers.IO) {
-            listOf("127.0.0.1" to "127.0.0.1", "::1" to "[::1]")
-                .firstOrNull { (ip, _) -> canConnect(ip, port) }
-                ?.let { (_, literal) -> "${uri.scheme}://$literal:$port" }
-        }
-        if (found != null) resolvedOrigin = found
-        return found ?: target
-    }
+    private suspend fun upstreamOrigin(target: String): String =
+        resolvedOrigin ?: loopbackOrigin(target, ::canConnect)?.also { resolvedOrigin = it } ?: target
 
-    private fun canConnect(host: String, port: Int): Boolean = runCatching {
-        Socket().use { it.connect(InetSocketAddress(host, port), 400) }
-        true
-    }.getOrDefault(false)
+    private suspend fun canConnect(host: String, port: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { it.connect(InetSocketAddress(host, port), 400) }
+            true
+        }.getOrDefault(false)
+    }
 
     /** "host:port" of the target as the user typed it - sent as the Host header upstream. */
     private fun targetAuthority(target: String): String =
@@ -291,4 +280,19 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         fun isRequestHopByHop(name: String) = name.lowercase() in REQUEST_STRIP
         fun isResponseHopByHop(name: String) = name.lowercase() in RESPONSE_STRIP
     }
+}
+
+/**
+ * For a `localhost` [target], the loopback origin that answers: `127.0.0.1` first, then `[::1]`.
+ * Dev servers like Vite bind `localhost` to IPv6 only, while the JVM resolves it to IPv4 first,
+ * so both are probed. Null if [target] isn't `localhost` or neither address answers.
+ */
+internal suspend fun loopbackOrigin(target: String, canConnect: suspend (host: String, port: Int) -> Boolean): String? {
+    val uri = runCatching { URI(target) }.getOrNull() ?: return null
+    if (!uri.host.equals("localhost", ignoreCase = true)) return null
+    val port = if (uri.port > 0) uri.port else if (uri.scheme == "https") 443 else 80
+    for ((ip, literal) in listOf("127.0.0.1" to "127.0.0.1", "::1" to "[::1]")) {
+        if (canConnect(ip, port)) return "${uri.scheme}://$literal:$port"
+    }
+    return null
 }
