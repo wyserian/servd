@@ -11,6 +11,9 @@ import dev.servd.core.chat.FileMeta
 import dev.servd.core.chat.Hello
 import dev.servd.core.files.DropLimits
 import dev.servd.core.files.FileStore
+import dev.servd.core.files.MediaTypes
+import io.ktor.server.http.content.LocalFileContent
+import io.ktor.server.plugins.partialcontent.PartialContent
 import dev.servd.core.qr.Qr
 import dev.servd.core.service.HttpService
 import dev.servd.core.service.Service
@@ -161,6 +164,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
     private fun Application.servdModule() {
         install(WebSockets)
+        install(PartialContent) // Range requests: video previews can seek
         // Auto-clear sweep (a no-op while auto-clear is off). Stops with the server.
         launch {
             while (isActive) {
@@ -339,7 +343,11 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         .withParameter(ContentDisposition.Parameters.FileName, meta.name)
                         .toString(),
                 )
-                call.respondFile(file)
+                // A safe media type so the chat can preview images/video/audio/text; opened
+                // directly it still downloads (attachment + nosniff). An id's bytes never change.
+                call.response.header("X-Content-Type-Options", "nosniff")
+                call.response.header(HttpHeaders.CacheControl, "private, max-age=86400, immutable")
+                call.respond(LocalFileContent(file, ContentType.parse(MediaTypes.forFile(meta.name, meta.contentType))))
             }
             delete("/files/{id}") {
                 val removed = call.parameters["id"]?.let { fileStore.remove(it) }

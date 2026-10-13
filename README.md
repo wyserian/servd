@@ -46,7 +46,10 @@ tab. The tabs that configure the host appear only on the host itself.
   a time or all as one zip, delete them, or clear them all. The hub never fills its disk, and the
   host can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
-  Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone.
+  Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone. Shared files
+  preview inline: images (tap one for a full-size viewer), video and audio players, and the first
+  lines of text and code files. Images over 10 MB wait for a tap. Image files also get thumbnails
+  in drop files.
 - **Activity alerts:** a message or file from someone else while you're away puts a count in the
   tab title and a dot on its icon. The chat tab shows unread messages. The bell in the top bar turns
   on browser notifications (per device; some browsers don't allow them on a self-signed page).
@@ -207,6 +210,10 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
 - **Drop files** can't fill the host's disk: uploads stop at the free-space floor (1 GB or 5%),
   plus the host's optional quota. Limits are counted as bytes arrive, not from the size a client
   claims.
+- **Previews** never run uploaded content. Files are served as attachments with `nosniff`. Only
+  raster images, video, audio and plain text get a real media type, decided by the hub from the
+  file name, not from what the uploader claims. SVG, HTML and everything else are served as plain
+  bytes or plain text.
 - **SSH/FTP** always require the password; there's no anonymous login. FTP uses explicit TLS
   (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
 - **Browse files** is off by default and set up only from the host. Clients can't go above the
@@ -275,7 +282,7 @@ Exact versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.
 | Build | Android Gradle Plugin | `8.7.3` | Android build (`multiDexEnabled` for Netty) |
 | Runtime | JDK | 17 target | Java 17 bytecode, built with JDK 21 |
 | Android | SDK | compile/target 35, min 24 | |
-| Server | Ktor + Netty | `3.0.3` | HTTPS + WebSocket; Netty is the engine on both platforms |
+| Server | Ktor + Netty | `3.0.3` | HTTPS + WebSocket; Netty is the engine on both platforms; partial-content for video seeking |
 | Proxy | Ktor client (CIO) | `3.0.3` | outbound HTTP + WebSocket forwarding |
 | TLS | JSSE / PKCS12 | JDK | self-signed keystore, SHA-256 fingerprint |
 | Net | `java.net.NetworkInterface` | JDK | LAN/hotspot address detection |

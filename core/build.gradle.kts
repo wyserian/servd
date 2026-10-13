@@ -40,6 +40,8 @@ kotlin {
                 // (Netty on desktop, TBD on Android) is provided by each platform module.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.websockets)
+                // Range requests, so shared videos can seek and stream in the chat preview.
+                implementation(libs.ktor.server.partial.content)
                 implementation(libs.ktor.network.tls.certificates)
                 // Ktor client (CIO engine) - outbound HTTP + WebSocket forwarding for the
                 // reverse proxy that re-serves a host-run web app to the LAN.

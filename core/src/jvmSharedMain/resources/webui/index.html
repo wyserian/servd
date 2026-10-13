@@ -175,6 +175,28 @@
   .msg.me .bubble { background: var(--accent-soft); border-radius: 12px 4px 12px 12px; }
   .sys { align-self: center; font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; }
   .file-msg { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  /* previews in chat */
+  .bubble.media { padding: 6px; display: flex; flex-direction: column; gap: 6px; white-space: normal; max-width: min(320px, 100%); }
+  .media-img { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 8px; overflow: hidden; }
+  .media-img img, .bubble.media video { display: block; max-width: 100%; max-height: 320px; border-radius: 8px; background: var(--surface); }
+  .bubble.media video { width: 308px; }
+  .bubble.media audio { width: 280px; max-width: 100%; }
+  .media-load { width: 260px; max-width: 100%; padding: 22px 12px; border: 0; border-radius: 8px; background: var(--surface); color: var(--muted); font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .media-load:hover { color: var(--ink); }
+  .media-gone { font-family: var(--mono); font-size: 12px; color: var(--faint); padding: 6px 4px 0; }
+  .text-peek { margin: 0; padding: 8px 10px; width: 308px; max-width: 100%; max-height: 230px; overflow: auto; background: var(--surface); border-radius: 8px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre; }
+  .media-cap { display: flex; align-items: center; gap: 8px; padding: 0 4px 2px; color: inherit; text-decoration: none; font-size: 12px; }
+  .media-cap .media-name { flex: 1; min-width: 0; font-family: var(--mono); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .media-cap .media-size { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+  .media-cap svg { color: var(--muted); flex-shrink: 0; }
+  .media-cap:hover svg { color: var(--accent-ink); }
+  .viewer { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: rgba(5,10,12,.9); }
+  .viewer[hidden] { display: none; }
+  .viewer img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 8px; }
+  .viewer-bar { display: flex; align-items: center; gap: 8px; max-width: 100%; color: #E6EDEF; font-family: var(--mono); font-size: 12.5px; }
+  .viewer-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px; }
+  .frow .fthumb { padding: 0; border: 0; overflow: hidden; cursor: zoom-in; }
+  .frow .fthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .file-msg .fi { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; }
   .composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 12px; }
   .composer textarea { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 1.4; min-width: 0; resize: none; height: 40px; max-height: 120px; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
@@ -348,6 +370,10 @@
 </head>
 <body>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Image preview" hidden>
+    <img id="viewerImg" alt="" />
+    <div class="viewer-bar"><span id="viewerName"></span><a class="mini-btn" id="viewerDl" download>download</a><button class="mini-btn" id="viewerClose" type="button">close</button></div>
+  </div>
   <div class="lock-screen" id="lockScreen" hidden>
     <form class="lock-box" id="lockForm" autocomplete="off">
       <div class="brand"><span class="prompt">~/</span>servd</div>
@@ -665,15 +691,71 @@
     log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
   }
   function addSys(t){ const stick=atBottom(); const el=document.createElement("div"); el.className="sys"; el.textContent="- "+t+" -"; log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight; }
+  // ---- previews: images, video, audio and text inline in chat; image thumbnails in drop files ----
+  // Kinds mirror the hub's MediaTypes (the extension first, then the uploader's claimed type), so
+  // a preview only ever uses a type the hub actually serves.
+  const IMG_EXT=/\.(jpe?g|png|gif|webp|avif|bmp)$/i, VID_EXT=/\.(mp4|m4v|mov|webm)$/i, AUD_EXT=/\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)$/i;
+  const TXT_EXT=/\.(txt|md|log|json|csv|tsv|xml|ya?ml|ini|conf|cfg|toml|properties|env|sql|sh|bat|ps1|py|js|ts|kts?|java|go|rs|c|h|cpp|hpp|cs|rb|php|swift|html?|css|gradle)$/i;
+  const AUTO_IMG_MAX=10*1048576; // bigger images wait for a tap (saves phones' data)
+  const TEXT_MAX=256*1024;
+  function previewKind(f){
+    const n=f.name, c=(f.contentType||"").toLowerCase();
+    if(IMG_EXT.test(n)) return "image";
+    if(VID_EXT.test(n)) return "video";
+    if(AUD_EXT.test(n)) return "audio";
+    if(TXT_EXT.test(n)) return "text";
+    if(/^image\/(jpeg|png|gif|webp|avif|bmp)$/.test(c)) return "image";
+    if(/^video\/(mp4|webm|quicktime)$/.test(c)) return "video";
+    if(/^audio\/(mpeg|mp4|aac|ogg|wav|flac)$/.test(c)) return "audio";
+    if(c.startsWith("text/plain")) return "text";
+    return null;
+  }
+  function fileUrl(f){ return "/files/"+encodeURIComponent(f.id); }
+  function imgThumb(f){ return '<button type="button" class="media-img" data-open="'+esc(f.id)+'" title="View"><img loading="lazy" alt="'+esc(f.name)+'" src="'+fileUrl(f)+'"></button>'; }
   function addFileMsg(f){
     const stick=atBottom(); const mine=f.fromName===userName;
     const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
     const who = mine ? "you" : esc(f.fromName);
     const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
-    el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(f.ts)+'</span></div>'+
-      '<a class="bubble file-msg" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'"><span class="fi">'+FILEICON+'</span>shared <b>'+esc(f.name)+'</b> &middot; '+fmtSize(f.size)+'</a>';
+    const url=fileUrl(f), kind=previewKind(f);
+    const cap='<a class="media-cap" href="'+url+'" download="'+esc(f.name)+'" title="Download"><span class="media-name">'+esc(f.name)+'</span><span class="media-size">'+fmtSize(f.size)+'</span>'+DLICON+'</a>';
+    let body;
+    if(kind==="image") body='<div class="bubble media">'+(f.size<=AUTO_IMG_MAX ? imgThumb(f) : '<button type="button" class="media-load">tap to preview &middot; '+fmtSize(f.size)+'</button>')+cap+'</div>';
+    else if(kind==="video") body='<div class="bubble media"><video controls preload="metadata" playsinline src="'+url+'"></video>'+cap+'</div>';
+    else if(kind==="audio") body='<div class="bubble media audio"><audio controls preload="none" src="'+url+'"></audio>'+cap+'</div>';
+    else if(kind==="text" && f.size<=TEXT_MAX) body='<div class="bubble media"><pre class="text-peek">loading&hellip;</pre>'+cap+'</div>';
+    else body='<a class="bubble file-msg" href="'+url+'" download="'+esc(f.name)+'"><span class="fi">'+FILEICON+'</span>shared <b>'+esc(f.name)+'</b> &middot; '+fmtSize(f.size)+'</a>';
+    el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(f.ts)+'</span></div>'+body;
     log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
+    wireMedia(el, f, stick);
   }
+  function wireMedia(el, f, stick){
+    const keep=()=>{ if(stick) log.scrollTop=log.scrollHeight; }; // media grows the bubble once loaded
+    // Deleted since, or not decodable: say so instead of showing a broken image.
+    const gone=()=>{ const m=el.querySelector(".media-img, video, audio, .media-load"); if(m) m.outerHTML='<span class="media-gone">preview unavailable</span>'; };
+    el.querySelectorAll("img").forEach(i=>{ i.addEventListener("load",keep,{once:true}); i.addEventListener("error",gone,{once:true}); });
+    el.querySelectorAll("video").forEach(v=>{ v.addEventListener("loadedmetadata",keep,{once:true}); v.addEventListener("error",gone,{once:true}); });
+    el.querySelectorAll("[data-open]").forEach(b=>b.addEventListener("click",()=>openViewer(f)));
+    const lb=el.querySelector(".media-load");
+    if(lb) lb.addEventListener("click",()=>{ lb.outerHTML=imgThumb(f); wireMedia(el,f,false); });
+    const pre=el.querySelector(".text-peek");
+    if(pre && pre.textContent==="loading…") fetch(fileUrl(f)).then(r=>{ if(!r.ok) throw 0; return r.text(); }).then(t=>{
+      const lines=t.replace(/\r\n?/g,"\n").replace(/\n$/,"").split("\n");
+      pre.textContent = lines.slice(0,12).map(l=>l.length>200 ? l.slice(0,200)+"…" : l).join("\n") + (lines.length>12 ? "\n… "+(lines.length-12)+" more lines" : "");
+      keep();
+    }).catch(()=>{ pre.textContent="(preview unavailable)"; });
+  }
+  // Full-size image viewer: Esc, the close button or a click outside the image closes it.
+  function openViewer(f){
+    $("viewerImg").src=fileUrl(f); $("viewerImg").alt=f.name;
+    $("viewerName").textContent=f.name+" · "+fmtSize(f.size);
+    $("viewerDl").href=fileUrl(f); $("viewerDl").setAttribute("download",f.name);
+    $("viewer").hidden=false; $("viewerClose").focus();
+  }
+  function closeViewer(){ $("viewer").hidden=true; $("viewerImg").removeAttribute("src"); }
+  $("viewerClose").addEventListener("click",closeViewer);
+  $("viewer").addEventListener("click",e=>{ if(e.target===$("viewer")) closeViewer(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !$("viewer").hidden) closeViewer(); });
   // A dropped folder is one chat message, updated as its files arrive.
   const folderMsgs=new Map(); // batch -> {el, count, size}
   function addFolderMsg(f){
@@ -729,7 +811,8 @@
       const row=document.createElement("div");
       if(g.kind==="file"){
         const f=g.f; row.className="frow";
-        row.innerHTML='<span class="fi">'+esc(ext(f.name))+'</span>'+
+        const thumb = previewKind(f)==="image" && f.size<=AUTO_IMG_MAX;
+        row.innerHTML=(thumb ? '<button type="button" class="fi fthumb" data-open="'+esc(f.id)+'" title="View"><img loading="lazy" alt="" src="'+fileUrl(f)+'"></button>' : '<span class="fi">'+esc(ext(f.name))+'</span>')+
           '<div class="fmeta"><div class="fname">'+esc(f.name)+'</div><div class="fsub">from '+esc(f.fromName)+' &middot; '+time(f.ts)+'</div></div>'+
           '<span class="fsize">'+fmtSize(f.size)+'</span>'+
           '<a class="dl" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'" title="Download">'+DLICON+'</a>'+
@@ -767,6 +850,7 @@
       renderFiles();
     }));
     flist.querySelectorAll('button[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelUpload(b.dataset.cancel)));
+    flist.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{ const f=files.get(b.dataset.open); if(f) openViewer(f); }));
   }
   function updateUpRow(id){
     const u=uploads.get(id); if(!u) return;
