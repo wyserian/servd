@@ -9,6 +9,7 @@ import dev.servd.core.chat.ChatSend
 import dev.servd.core.chat.ClearChat
 import dev.servd.core.chat.FileMeta
 import dev.servd.core.chat.Hello
+import dev.servd.core.files.DropLimits
 import dev.servd.core.files.FileStore
 import dev.servd.core.qr.Qr
 import dev.servd.core.service.HttpService
@@ -32,6 +33,7 @@ import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
 import io.ktor.server.plugins.origin
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receiveParameters
@@ -54,6 +56,9 @@ import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -94,6 +99,8 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     proxyPort: Int = 8080,
     /** Where the optional join PIN is persisted; null keeps it in memory only. */
     pinFile: File? = null,
+    /** Where the drop-files limits (quota, auto-clear) are persisted; null keeps them in memory only. */
+    limitsFile: File? = null,
 ) {
     val url: String get() = "https://$advertisedHost:$port"
 
@@ -102,7 +109,10 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
     private val startedAt = System.currentTimeMillis()
     private val chatHub = ChatHub(serverName = advertisedHost)
-    private val fileStore = FileStore(filesDir)
+    private val fileStore = FileStore(filesDir, DropLimits(limitsFile))
+
+    /** Drop-files quota and auto-clear (both off by default); the host can also set them before [start]. */
+    val dropLimits: DropLimits get() = fileStore.limits
     private val browser = Browser().also { b ->
         b.pickerRoots = pickerRoots.map { (label, path) -> Browser.PickerDir(label, path) }
         if (browseDir != null) runCatching { b.enable(browseDir, browseWritable) }
@@ -151,6 +161,13 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
     private fun Application.servdModule() {
         install(WebSockets)
+        // Auto-clear sweep (a no-op while auto-clear is off). Stops with the server.
+        launch {
+            while (isActive) {
+                delay(60_000)
+                runCatching { expireFiles() }
+            }
+        }
         // Join PIN gate: while a PIN is set, everything except the page itself and the PIN check
         // needs a session - including the chat socket, files, browse, QR and status.
         intercept(ApplicationCallPipeline.Plugins) {
@@ -229,32 +246,54 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
             // File sharing: upload (multipart), list (newest first), download (by id).
             post("/files") {
+                // Refuse up front when the declared body can't fit (a little slack for multipart
+                // framing). The store also enforces the limits while streaming, since the
+                // declared size can't be trusted.
+                val declared = call.request.contentLength()
+                if (declared != null && declared > fileStore.room() + 64 * 1024) {
+                    return@post call.respondText(
+                        json.encodeToString(fileStore.usage()), ContentType.Application.Json, HttpStatusCode.PayloadTooLarge,
+                    )
+                }
                 // Ktor caps multipart parts at ~50 MB by default, which silently 500s bigger uploads.
                 // File parts are streamed straight to disk below, so lift the cap well up (5 GB).
                 val multipart = call.receiveMultipart(formFieldLimit = 5L * 1024 * 1024 * 1024)
                 var from = "someone"
                 val saved = mutableListOf<FileMeta>()
-                multipart.forEachPart { part ->
-                    when (part) {
-                        is PartData.FormItem ->
-                            if (part.name == "from") from = part.value.take(40).ifBlank { "someone" }
-                        is PartData.FileItem -> {
-                            val name = part.originalFileName ?: "file"
-                            val contentType = part.contentType?.toString()
-                            val meta = part.provider().toInputStream().use {
-                                fileStore.save(name, contentType, from, it)
+                try {
+                    multipart.forEachPart { part ->
+                        try {
+                            when (part) {
+                                is PartData.FormItem ->
+                                    if (part.name == "from") from = part.value.take(40).ifBlank { "someone" }
+                                is PartData.FileItem -> {
+                                    val name = part.originalFileName ?: "file"
+                                    val contentType = part.contentType?.toString()
+                                    val meta = part.provider().toInputStream().use {
+                                        fileStore.save(name, contentType, from, it)
+                                    }
+                                    chatHub.announceFile(meta)
+                                    saved += meta
+                                }
+                                else -> {}
                             }
-                            chatHub.announceFile(meta)
-                            saved += meta
+                        } finally {
+                            part.dispose()
                         }
-                        else -> {}
                     }
-                    part.dispose()
+                } catch (e: FileStore.StorageFullException) {
+                    return@post call.respondText(
+                        json.encodeToString(e.usage), ContentType.Application.Json, HttpStatusCode.PayloadTooLarge,
+                    )
                 }
                 call.respondText(json.encodeToString(saved), ContentType.Application.Json)
             }
             get("/files") {
                 call.respondText(json.encodeToString(fileStore.list()), ContentType.Application.Json)
+            }
+            // Space used / left and the auto-clear age, shown under the drop zone.
+            get("/files/usage") {
+                call.respondText(json.encodeToString(fileStore.usage()), ContentType.Application.Json)
             }
             // Every shared file in one zip, streamed (nothing buffered in memory). Duplicate names
             // get a " (2)" suffix so no entry overwrites another when extracted.
@@ -416,6 +455,26 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 if (pin != null) chatHub.closeWhere { !isLoopback(it) } // drop now-unauthorised chats
                 call.respondText(pinConfig(), ContentType.Application.Json)
             }
+            // Drop-files limits, host-only: optional quota (bytes) and auto-clear age (hours).
+            get("/admin/storage") {
+                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
+                call.respondText(json.encodeToString(fileStore.usage()), ContentType.Application.Json)
+            }
+            post("/admin/storage") {
+                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
+                val p = call.receiveParameters()
+                val ok = runCatching {
+                    val maxBytes = p["maxBytes"]?.trim().orEmpty().ifEmpty { null }?.toLong()
+                    val expireHours = p["expireHours"]?.trim().orEmpty().ifEmpty { null }?.toInt()
+                    fileStore.limits.set(maxBytes, expireHours)
+                }.isSuccess
+                if (ok) expireFiles() // a newly shorter auto-clear applies right away
+                call.respondText(
+                    json.encodeToString(fileStore.usage()),
+                    ContentType.Application.Json,
+                    status = if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest,
+                )
+            }
             // Reverse proxy (re-serve a host-run web app to the LAN), host-only.
             get("/admin/proxy") {
                 if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
@@ -466,6 +525,11 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 else call.respond(HttpStatusCode.NotFound)
             }
         }
+    }
+
+    /** Delete files past the auto-clear age and tell every dashboard. */
+    private suspend fun expireFiles() {
+        fileStore.expire().forEach { chatHub.announceFileRemoved(it.id) }
     }
 
     private fun pinConfig(): String =

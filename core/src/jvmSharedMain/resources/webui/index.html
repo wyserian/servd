@@ -195,6 +195,10 @@
   .drop .big { color: var(--accent); }
   .drop strong { font-family: var(--mono); font-weight: 700; color: var(--ink); }
   .drop small { font-family: var(--mono); color: var(--faint); }
+  .drop-foot { display: flex; flex-direction: column; gap: 4px; margin-top: -6px; }
+  .drop-usage { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+  .drop-usage:empty { display: none; }
+  .drop-usage.full { color: var(--warn); }
   .flist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .frow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); transition: background .15s; }
   .frow .fi { width: 34px; height: 34px; border-radius: 7px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
@@ -244,6 +248,12 @@
   .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
   .pin-field:focus, .pin-input:focus { outline: none; border-color: var(--accent); }
   .pin-note, .lock-hint { font-size: 11.5px; color: var(--faint); line-height: 1.45; }
+  .sto-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sto-field { flex: 1; min-width: 110px; display: flex; flex-direction: column; gap: 3px; }
+  .sto-label { font-size: 11px; color: var(--muted); }
+  .sto-input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; width: 100%; }
+  .sto-input:focus { outline: none; border-color: var(--accent); }
+  .sto-save { align-self: flex-start; }
   .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
   .lock-screen[hidden] { display: none; }
   .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
@@ -383,6 +393,18 @@
               <div class="form-err" id="admPinErr" role="alert" hidden></div>
               <div class="pin-note" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</div>
             </div>
+            <div class="kv">
+              <div class="k-row"><span class="k">Drop files</span><span class="pin-state" id="stoState">no limits</span></div>
+              <div class="sto-grid">
+                <label class="sto-field"><span class="sto-label">Quota (GB)</span><input class="sto-input" id="stoQuota" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="no limit" /></label>
+                <label class="sto-field"><span class="sto-label">Auto-clear</span>
+                  <select class="sto-input" id="stoExpire"><option value="">off</option><option value="1">after 1 hour</option><option value="24">after 24 hours</option><option value="168">after 7 days</option></select>
+                </label>
+              </div>
+              <button class="mini-btn btn-primary sto-save" id="stoSave" type="button" disabled>save</button>
+              <div class="form-err" id="stoErr" role="alert" hidden></div>
+              <div class="pin-note">The hub always keeps 1 GB (or 5% of the disk) free, quota or not.</div>
+            </div>
           </div>
         </section>
       </div>
@@ -422,6 +444,10 @@
               <strong>Drop files here to share</strong>
               <small>or click to browse - sent to every device on the hub</small>
             </label>
+            <div class="drop-foot">
+              <span class="drop-usage" id="dropUsage"></span>
+              <div class="form-err" id="dropErr" role="alert" hidden></div>
+            </div>
             <div class="flist" id="flist"><div class="files-empty">No files shared yet.</div></div>
           </div>
         </div>
@@ -671,15 +697,40 @@
   }
   function addFile(f, announce){ const isNew=!files.has(f.id); files.set(f.id,f); renderFiles(); if(isNew&&announce) addFileMsg(f); }
   function loadFiles(){ fetch("/files").then(r=>r.json()).then(list=>{ list.forEach(f=>files.set(f.id,f)); renderFiles(); }).catch(()=>{}); }
+  // ---- drop-files storage: usage line, and refusing what can't fit before uploading it ----
+  let usage=null;
+  function fmtHours(h){ return h%24===0 ? (h/24)+(h===24?" day":" days") : h+(h===1?" hour":" hours"); }
+  function renderUsage(u){
+    usage=u;
+    const el=$("dropUsage");
+    const used = fmtSize(u.usedBytes)+(u.maxBytes ? " of "+fmtSize(u.maxBytes) : "")+" used";
+    const parts = u.roomBytes>0 ? [used, fmtSize(u.roomBytes)+" free"] : [used, "hub storage is full"];
+    if(u.expireHours) parts.push("files clear after "+fmtHours(u.expireHours));
+    el.textContent=parts.join(" · ");
+    el.classList.toggle("full", u.roomBytes<=0);
+  }
+  function loadUsage(){ fetch("/files/usage").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderUsage).catch(()=>{}); }
+  function dropErr(msg){ const e=$("dropErr"); e.textContent=msg; e.hidden=!msg; }
+  function noRoom(names){
+    const free = usage ? fmtSize(usage.roomBytes)+" free" : "no space left";
+    dropErr("Not enough space on the hub for "+(names.length===1 ? '"'+names[0]+'"' : names.length+" files")+" ("+free+").");
+  }
+
   function upload(fileList){
+    dropErr("");
+    let budget = usage ? usage.roomBytes : Infinity;
+    const skipped=[];
     for(const file of fileList){
+      if(file.size>budget){ skipped.push(file.name); continue; }
+      budget-=file.size;
       const id="up-"+(upSeq++);
       const xhr=new XMLHttpRequest();
       uploads.set(id,{name:file.name,size:file.size,loaded:0,xhr});
       renderFiles();
       xhr.upload.addEventListener("progress",e=>{ const u=uploads.get(id); if(u){ u.loaded=e.loaded; updateUpRow(id); } });
       xhr.addEventListener("load",()=>{
-        if(!(xhr.status>=200&&xhr.status<300)) addSys("upload failed: "+file.name);
+        if(xhr.status===413){ try{ renderUsage(JSON.parse(xhr.responseText)); }catch{} noRoom([file.name]); }
+        else if(!(xhr.status>=200&&xhr.status<300)) addSys("upload failed: "+file.name);
         uploads.delete(id); renderFiles(); // the shared file itself arrives via the /ws announce
       });
       xhr.addEventListener("error",()=>{ addSys("upload failed: "+file.name); uploads.delete(id); renderFiles(); });
@@ -687,6 +738,7 @@
       const fd=new FormData(); fd.append("from",userName); fd.append("file",file,file.name);
       xhr.open("POST","/files"); xhr.send(fd);
     }
+    if(skipped.length) noRoom(skipped);
   }
 
   ["dragenter","dragover"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add("over");}));
@@ -748,7 +800,7 @@
   }
   function checkAdmin(){
     fetch("/admin/services").then(r=>{ if(!r.ok) throw 0; return r.json(); })
-      .then(list=>{ $("hostCard").hidden=false; applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); loadAdmPin(); })
+      .then(list=>{ $("hostCard").hidden=false; applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); loadAdmPin(); loadAdmStorage(); })
       .catch(()=>{ $("hostCard").hidden=true; applyHostMode(false); });
   }
 
@@ -1003,10 +1055,10 @@
         case "roster": renderRoster(m.peers); break;
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); break;
         case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
-        case "file": addFile(m.file,true); break;
+        case "file": addFile(m.file,true); loadUsage(); break;
         case "chatCleared": log.innerHTML=""; addSys("chat cleared by "+esc(m.byName)); break;
-        case "fileRemoved": files.delete(m.id); renderFiles(); break;
-        case "filesCleared": files.clear(); renderFiles(); addSys("files cleared by "+esc(m.byName)); break;
+        case "fileRemoved": files.delete(m.id); renderFiles(); loadUsage(); break;
+        case "filesCleared": files.clear(); renderFiles(); loadUsage(); addSys("files cleared by "+esc(m.byName)); break;
       }
     };
   }
@@ -1070,14 +1122,50 @@
   $("admPinSave").addEventListener("click",()=>savePin($("admPin").value, $("admPinSave"), "saving…"));
   $("admPinOff").addEventListener("click",()=>savePin("", $("admPinOff"), "turning off…"));
 
+  // Host: drop-files quota (GB, blank = none) and auto-clear, from the host card.
+  const GB=1073741824;
+  let stoCur={maxBytes:null,expireHours:null};
+  function stoForm(){
+    const q=$("stoQuota").value.trim();
+    return { maxBytes: q==="" ? null : Math.round(parseFloat(q)*GB), expireHours: $("stoExpire").value ? +$("stoExpire").value : null };
+  }
+  function syncStoBtn(){
+    const f=stoForm();
+    const valid = f.maxBytes===null || (Number.isFinite(f.maxBytes) && f.maxBytes>0);
+    $("stoSave").disabled = !valid || (f.maxBytes===stoCur.maxBytes && f.expireHours===stoCur.expireHours);
+  }
+  function renderStorage(u){
+    stoCur={maxBytes:u.maxBytes, expireHours:u.expireHours};
+    $("stoQuota").value = u.maxBytes ? +(u.maxBytes/GB).toFixed(2) : "";
+    $("stoExpire").value = u.expireHours ? String(u.expireHours) : "";
+    const st=[u.maxBytes ? fmtSize(u.maxBytes)+" quota" : null, u.expireHours ? "clear after "+fmtHours(u.expireHours) : null].filter(Boolean);
+    $("stoState").textContent = st.length ? st.join(" · ") : "no limits";
+    $("stoState").classList.toggle("on", st.length>0);
+    $("stoSave").textContent="save"; syncStoBtn();
+    renderUsage(u);
+  }
+  function loadAdmStorage(){ fetch("/admin/storage").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderStorage).catch(()=>{}); }
+  $("stoQuota").addEventListener("input",()=>{ $("stoErr").hidden=true; syncStoBtn(); });
+  $("stoExpire").addEventListener("change",()=>{ $("stoErr").hidden=true; syncStoBtn(); });
+  $("stoSave").addEventListener("click",()=>{
+    const b=$("stoSave"); if(b.disabled) return;
+    const f=stoForm();
+    b.disabled=true; b.textContent="saving…";
+    fetch("/admin/storage",{method:"POST",body:new URLSearchParams({maxBytes:f.maxBytes??"", expireHours:f.expireHours??""})})
+      .then(r=>r.json().then(u=>{ if(!r.ok) throw 0; renderStorage(u); }))
+      .catch(()=>{ const e=$("stoErr"); e.textContent="Couldn't save. The quota must be more than 0 GB."; e.hidden=false; b.textContent="save"; syncStoBtn(); });
+  });
+
   let booted=false;
   function boot(){
     booted=true;
     $("qr").src = "/qr"; // scan-to-join QR of the shareable hub URL (shown for everyone)
     loadFiles();
+    loadUsage();
     checkAdmin();
     connect();
     setInterval(loadStatus, 15000); // keep uptime / connected count fresh
+    setInterval(loadUsage, 15000);  // disk space changes outside servd too
     setInterval(loadBrowseInfo, 15000); // pick up the host enabling/disabling browsing
   }
   checkAuth().then(ok=>{ if(ok) boot(); });

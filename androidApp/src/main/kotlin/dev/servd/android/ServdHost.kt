@@ -82,6 +82,7 @@ object ServdHost {
             interfaceName = lan?.interfaceName,
             pickerRoots = storagePickerRoots(),
             pinFile = File(dataDir, "join.pin"),
+            limitsFile = File(dataDir, "storage.properties"),
         )
         srv.start(wait = false)
         server = srv

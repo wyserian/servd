@@ -41,7 +41,8 @@ tab. The tabs that configure the host appear only on the host itself.
 
 - **HTTPS dashboard** on port `8443`, bound to your LAN or hotspot IP, with light and dark themes.
 - **Drop files:** drag and drop a file and it appears on every device. Download files one at a
-  time or all as one zip, delete one, or clear them all.
+  time or all as one zip, delete one, or clear them all. The hub never fills its disk, and the host
+  can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
   Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone.
 - **Browse files** (optional): the host shares a real folder, read-only or with uploads. Clients
@@ -147,8 +148,16 @@ so even an HTTP-only or localhost-only app is reachable and encrypted across the
 | `8080` | serve site (only while serving; configurable) |
 
 All ports are non-privileged. SSH and FTP share one generated credential, username `servd`. Data
-(keystore, shared files, credential, join PIN) lives in `~/.servd` on desktop, and in the app's
-private storage on Android.
+(keystore, shared files, credential, join PIN, storage limits) lives in `~/.servd` on desktop, and
+in the app's private storage on Android. Drop files last until cleared: they don't survive a
+restart, and the previous run's files are deleted on start.
+
+**Storage limits:** uploads that would leave the host's disk with less than 1 GB or 5% free (whichever
+is larger) are refused. That's always on. In the **This host** card (or with `--max-storage` /
+`--expire`), the host can also cap drop files with a quota and auto-clear them after 1 hour,
+24 hours or 7 days. Both are off by default and saved until changed. Everyone sees the space used and
+free under the drop zone. A file that doesn't fit is refused before it uploads, or cut off mid-way
+with nothing left behind. SFTP/FTP uploads don't count toward the quota.
 
 **Join PIN:** set it in the **This host** card (or with `--pin`). The host itself never needs it.
 Other devices see a PIN screen first, then stay signed in for 30 days, until the PIN changes or the
@@ -173,6 +182,8 @@ servd discover            # find hubs on the network without typing an IP
 | `--proxy-target URL` | serve a running site on start | off |
 | `--proxy-port N` | serve-site port | `8080` |
 | `--pin DIGITS` / `--pin off` | set (and save) or clear the join PIN | saved PIN, else off |
+| `--max-storage 10G` / `off` | drop-files quota (saved; `K`/`M`/`G` sizes) | saved, else none |
+| `--expire 1h\|24h\|7d` / `off` | auto-clear drop files after that age (saved) | saved, else off |
 
 ## Security
 
@@ -188,6 +199,9 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
   strong password.
 - **Admin routes** (`/admin/*`: service toggles, host info, certificate, join PIN, folder and proxy
   setup) answer only on **loopback**. Only the host device can change settings.
+- **Drop files** can't fill the host's disk: uploads stop at the free-space floor (1 GB or 5%),
+  plus the host's optional quota. Limits are counted as bytes arrive, not from the size a client
+  claims.
 - **SSH/FTP** always require the password; there's no anonymous login. FTP uses explicit TLS
   (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
 - **Browse files** is off by default and set up only from the host. Clients can't go above the
@@ -226,6 +240,8 @@ servd/
   - `ServiceManager` starts, stops and toggles services, one call at a time.
   - `ChatHub` tracks who's connected and broadcasts chat, join/leave and roster events.
   - `JoinPin` (`jvmSharedMain`) holds the optional PIN, the sessions and the per-device lockout.
+  - `FileStore` + `DropLimits` (`jvmSharedMain`) store drop files and enforce the free-space
+    floor, the quota and auto-clear (swept every minute).
 - **Request flow**:
 
   | Area | Routes |
@@ -234,10 +250,10 @@ servd/
   | Join PIN | `GET /auth` state · `POST /auth` check PIN, set session cookie |
   | Host status | `GET /status`: host info + fingerprint |
   | Chat | WebSocket `/ws`: announce a name, then chat |
-  | Drop files | `POST /files` upload · `GET /files` list · `GET /files/{id}` · `GET /files/zip` · delete/clear |
+  | Drop files | `POST /files` upload (413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` · `GET /files/usage` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
   | Live site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
-  | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/browse*` and `/admin/proxy` |
+  | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/storage`, `/admin/browse*` and `/admin/proxy` |
 
 - **Out of scope**: Bluetooth (Wi-Fi/hotspot only), a native Compose UI, end-to-end encryption,
   scanning the whole LAN (the roster is the hub's peers plus mDNS hub discovery), and an external

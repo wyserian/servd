@@ -32,6 +32,7 @@ import kotlin.system.exitProcess
  *       [--browse-dir PATH [--browse-write]]                        also serve a folder to clients
  *       [--proxy-target URL [--proxy-port N]]                       also re-serve a live web app
  *       [--pin DIGITS | --pin off]                                  set (and save) or clear the join PIN
+ *       [--max-storage 10G|off] [--expire 1h|24h|7d|off]            drop-files quota / auto-clear (saved)
  *   servd discover                                                  find hubs on the network
  */
 fun main(args: Array<String>) {
@@ -91,7 +92,17 @@ fun main(args: Array<String>) {
         proxyTarget = opts.proxyTarget,
         proxyPort = opts.proxyPort,
         pinFile = File(dataDir, "join.pin"),
+        limitsFile = File(dataDir, "storage.properties"),
     )
+    if (opts.maxStorage != null || opts.expire != null) {
+        // A flag replaces that saved limit ("off" clears it); the other one is kept.
+        val limits = server.dropLimits
+        val maxBytes = opts.maxStorage?.let { parseSize(it) ?: usageError("--max-storage takes a size like 10G or 500M (or \"off\").") }
+            ?: limits.maxBytes
+        val expireHours = opts.expire?.let { parseExpiry(it) ?: usageError("--expire takes 1h, 24h or 7d (or \"off\").") }
+            ?: limits.expireHours
+        limits.set(maxBytes.takeIf { it != OFF }, expireHours.takeIf { it != OFF.toInt() })
+    }
     when (opts.pin) {
         null -> {}
         "off" -> server.joinPin.set(null)
@@ -117,6 +128,13 @@ fun main(args: Array<String>) {
     println("          ${tls.fingerprintSha256}")
     println("keystore: ${tls.file}")
     server.joinPin.current?.let { println("join PIN: $it   (other devices must enter it)") }
+    server.dropLimits.let { l ->
+        if (l.maxBytes != null || l.expireHours != null) {
+            val quota = l.maxBytes?.let { "quota ${it / (1L shl 20)} MB" }
+            val clear = l.expireHours?.let { "auto-clear after ${if (it % 24 == 0) "${it / 24} d" else "$it h"}" }
+            println("files   : ${listOfNotNull(quota, clear).joinToString(", ")}")
+        }
+    }
     println()
     // Advertise over mDNS so other devices can find this hub without typing an IP.
     val advertiser = MdnsAdvertiser()
@@ -168,6 +186,31 @@ private fun useOwnSocketDir(dataDir: File) {
     val dir = listOf(File(dataDir, "sock"), File(System.getProperty("user.home"), ".servd${File.separator}sock"))
         .firstOrNull { it.absolutePath.length <= 80 } ?: return
     if (dir.isDirectory || dir.mkdirs()) System.setProperty("jdk.net.unixdomain.tmpdir", dir.absolutePath)
+}
+
+/** Marks "off" in [parseSize] / [parseExpiry] (distinct from null = unparseable). */
+private const val OFF = -1L
+
+/** "10G", "500M", "2048K" or plain bytes; "off" = [OFF]; null if unparseable or not positive. */
+private fun parseSize(s: String): Long? {
+    if (s.equals("off", ignoreCase = true)) return OFF
+    val m = Regex("""(\d+(?:\.\d+)?)\s*([KMG]?)B?""", RegexOption.IGNORE_CASE).matchEntire(s.trim()) ?: return null
+    val unit = when (m.groupValues[2].uppercase()) { "K" -> 1L shl 10; "M" -> 1L shl 20; "G" -> 1L shl 30; else -> 1L }
+    return (m.groupValues[1].toDouble() * unit).toLong().takeIf { it > 0 }
+}
+
+/** "1h", "24h" or "7d" as hours; "off" = [OFF]; null if not one of the allowed choices. */
+private fun parseExpiry(s: String): Int? = when (s.trim().lowercase()) {
+    "off" -> OFF.toInt()
+    "1h" -> 1
+    "24h", "1d" -> 24
+    "7d", "168h" -> 168
+    else -> null
+}
+
+private fun usageError(message: String): Nothing {
+    println(message)
+    exitProcess(1)
 }
 
 private fun portFree(host: String, port: Int): Boolean =
@@ -253,6 +296,8 @@ private data class Opts(
     val proxyTarget: String? = null,
     val proxyPort: Int = 8080,
     val pin: String? = null,
+    val maxStorage: String? = null,
+    val expire: String? = null,
 ) {
     companion object {
         fun parse(args: Array<String>): Opts {
@@ -265,6 +310,8 @@ private data class Opts(
             var proxyTarget: String? = null
             var proxyPort = 8080
             var pin: String? = null
+            var maxStorage: String? = null
+            var expire: String? = null
             var i = 0
             while (i < args.size) {
                 when (args[i]) {
@@ -278,10 +325,12 @@ private data class Opts(
                     "--proxy-target" -> proxyTarget = args.getOrNull(++i)
                     "--proxy-port" -> proxyPort = args.getOrNull(++i)?.toIntOrNull() ?: proxyPort
                     "--pin" -> pin = args.getOrNull(++i)
+                    "--max-storage" -> maxStorage = args.getOrNull(++i)
+                    "--expire" -> expire = args.getOrNull(++i)
                 }
                 i++
             }
-            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort, pin)
+            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort, pin, maxStorage, expire)
         }
     }
 }
