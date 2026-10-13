@@ -13,6 +13,8 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.ApplicationEngineFactory
@@ -68,6 +70,10 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     private val bindHost: String,
     private val advertisedHost: String,
     private val tls: TlsKeyStore,
+    /** Whether a request may use the proxied site (the hub's join-PIN check). */
+    private val allows: (ApplicationCall) -> Boolean = { true },
+    /** The hub's dashboard URL, linked from the "enter the PIN first" page. */
+    private val hubUrl: String? = null,
 ) {
     @Volatile private var server: EmbeddedServer<TEngine, TConfiguration>? = null
     @Volatile private var currentTarget: String? = null
@@ -138,6 +144,21 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
 
     private fun Application.proxyModule(target: String) {
         install(WebSockets)
+        // Join PIN: without a hub session, point the visitor at the hub to enter the PIN first.
+        intercept(ApplicationCallPipeline.Plugins) {
+            if (!allows(call)) {
+                val link = hubUrl?.let { """<a href="$it/">$it</a>""" } ?: "the servd hub"
+                call.respondText(
+                    """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">""" +
+                        """<title>servd - PIN required</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 16px;line-height:1.5">""" +
+                        """<h1 style="font-size:1.2rem">PIN required</h1><p>This site is shared through servd, and the hub needs a PIN. """ +
+                        """Open $link, enter the PIN, then come back and reload this page.</p></body>""",
+                    ContentType.Text.Html,
+                    HttpStatusCode.Unauthorized,
+                )
+                finish()
+            }
+        }
         routing {
             // WebSocket upgrades on any path (HMR / live-reload / app sockets).
             webSocket("{...}") { proxyWebSocket(target, this) }

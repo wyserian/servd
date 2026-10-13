@@ -237,6 +237,20 @@
 
   /* ---------- host card (left column) ---------- */
   .host-card-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  /* join PIN: the host's setting (host card) and the guests' PIN screen */
+  .pin-state { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .pin-state.on { color: var(--accent-ink); font-weight: 700; }
+  .pin-set { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
+  .pin-field:focus, .pin-input:focus { outline: none; border-color: var(--accent); }
+  .pin-note, .lock-hint { font-size: 11.5px; color: var(--faint); line-height: 1.45; }
+  .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
+  .lock-screen[hidden] { display: none; }
+  .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
+  .lock-label { font-size: 14px; color: var(--ink); }
+  .pin-input { font-family: var(--mono); font-size: 24px; letter-spacing: .4em; text-align: center; padding: 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); width: 100%; }
+  .lock-box .mini-btn { min-height: 40px; font-size: 13px; }
+  .lock-box .brand { order: 0; } /* the mobile topbar reorders .brand; keep it on top here */
   .kv { display: flex; flex-direction: column; gap: 3px; }
   .k { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
   .k-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -309,6 +323,16 @@
 </style>
 </head>
 <body>
+  <div class="lock-screen" id="lockScreen" hidden>
+    <form class="lock-box" id="lockForm" autocomplete="off">
+      <div class="brand"><span class="prompt">~/</span>servd</div>
+      <label class="lock-label" for="pinInput">Enter the PIN to join this hub</label>
+      <input class="pin-input" id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinErr" />
+      <button class="mini-btn btn-primary" id="pinBtn" type="submit" disabled>join</button>
+      <div class="form-err" id="pinErr" role="alert" hidden></div>
+      <div class="lock-hint">Ask the host for the PIN. It's shown in their dashboard.</div>
+    </form>
+  </div>
   <div class="app">
     <header class="topbar">
       <div class="brand"><span class="prompt">~/</span>servd<span class="ver" id="brandVer"></span></div>
@@ -348,6 +372,16 @@
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
                 </button>
               </div>
+            </div>
+            <div class="kv">
+              <div class="k-row"><span class="k">Join PIN</span><span class="pin-state" id="pinState">off</span></div>
+              <div class="pin-set">
+                <input class="pin-field" id="admPin" type="text" inputmode="numeric" maxlength="8" placeholder="4-8 digits" spellcheck="false" autocomplete="off" aria-label="Join PIN" />
+                <button class="mini-btn btn-primary" id="admPinSave" type="button" disabled>set PIN</button>
+                <button class="mini-btn btn-danger" id="admPinOff" type="button" hidden>turn off</button>
+              </div>
+              <div class="form-err" id="admPinErr" role="alert" hidden></div>
+              <div class="pin-note" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</div>
             </div>
           </div>
         </section>
@@ -714,7 +748,7 @@
   }
   function checkAdmin(){
     fetch("/admin/services").then(r=>{ if(!r.ok) throw 0; return r.json(); })
-      .then(list=>{ $("hostCard").hidden=false; applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); })
+      .then(list=>{ $("hostCard").hidden=false; applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); loadAdmPin(); })
       .catch(()=>{ $("hostCard").hidden=true; applyHostMode(false); });
   }
 
@@ -960,7 +994,8 @@
   function connect(){
     ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
     ws.onopen=()=>{ setConn(true); sayHello(); loadStatus(); loadBrowseInfo(); };
-    ws.onclose=()=>{ setConn(false); clearTimeout(retry); retry=setTimeout(connect,1500); };
+    // Reconnect - unless the hub now wants a PIN (it was set or changed), then show the PIN screen.
+    ws.onclose=()=>{ setConn(false); clearTimeout(retry); retry=setTimeout(()=>checkAuth().then(ok=>{ if(ok) connect(); }),1500); };
     ws.onerror=()=>ws.close();
     ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data); }catch{ return; }
       switch(m.type){
@@ -977,12 +1012,75 @@
   }
   function sayHello(){ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:"hello",name:userName})); }
 
-  $("qr").src = "/qr"; // scan-to-join QR of the shareable hub URL (shown for everyone)
-  loadFiles();
-  checkAdmin();
-  connect();
-  setInterval(loadStatus, 15000); // keep uptime / connected count fresh
-  setInterval(loadBrowseInfo, 15000); // pick up the host enabling/disabling browsing
+  // ---- join PIN ----
+  // Guests: when the host set a PIN, nothing loads until it's entered (the server refuses anyway).
+  function checkAuth(){
+    return fetch("/auth").then(r=>r.json()).then(a=>{ showLock(!a.ok); return !!a.ok; }).catch(()=>true);
+  }
+  function showLock(on){
+    $("lockScreen").hidden=!on;
+    if(on) setTimeout(()=>$("pinInput").focus(),0);
+  }
+  function pinErr(msg){ const e=$("pinErr"); e.textContent=msg; e.hidden=!msg; }
+  $("pinInput").addEventListener("input",()=>{
+    const i=$("pinInput"); i.value=i.value.replace(/\D/g,"").slice(0,8);
+    $("pinBtn").disabled = i.value.length<4; pinErr("");
+  });
+  $("lockForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const b=$("pinBtn"); if(b.disabled) return;
+    b.disabled=true; b.textContent="checking…";
+    fetch("/auth",{method:"POST",body:new URLSearchParams({pin:$("pinInput").value})})
+      .then(r=>r.json().then(a=>({status:r.status,a})))
+      .then(({status,a})=>{
+        if(a.ok){ $("pinInput").value=""; showLock(false); if(booted){ loadFiles(); connect(); } else boot(); return; }
+        if(status===429) pinErr("Too many tries. Wait "+Math.ceil(a.retryAfterMs/1000)+"s, then try again.");
+        else pinErr("Wrong PIN. "+a.triesLeft+" "+(a.triesLeft===1?"try":"tries")+" left before a short lockout.");
+        $("pinInput").select();
+      })
+      .catch(()=>pinErr("Couldn't reach the hub. Check your connection."))
+      .finally(()=>{ b.textContent="join"; b.disabled=$("pinInput").value.length<4; });
+  });
+
+  // Host: set / change / turn off the PIN from the host card.
+  let curPin=null;
+  function renderPin(c){
+    curPin = c.enabled ? c.pin : null;
+    $("pinState").textContent = curPin ? "on" : "off";
+    $("pinState").classList.toggle("on", !!curPin);
+    $("admPin").value = curPin || "";
+    $("admPinSave").textContent = curPin ? "change" : "set PIN";
+    $("admPinOff").hidden = !curPin; $("admPinOff").textContent = "turn off"; $("admPinOff").disabled = false;
+    $("pinNote").textContent = curPin
+      ? "Other devices must enter this PIN to join. Changing it signs them out."
+      : "Off: anyone on this network can join. Set a PIN on shared Wi-Fi.";
+    syncPinBtn();
+  }
+  function syncPinBtn(){ const v=$("admPin").value; $("admPinSave").disabled = !/^\d{4,8}$/.test(v) || v===curPin; }
+  function loadAdmPin(){ fetch("/admin/pin").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderPin).catch(()=>{}); }
+  function savePin(pin, btn, busy){
+    const err=$("admPinErr"); err.hidden=true;
+    const label=btn.textContent; btn.disabled=true; btn.textContent=busy;
+    fetch("/admin/pin",{method:"POST",body:new URLSearchParams({pin})})
+      .then(r=>r.json().then(c=>{ if(!r.ok) throw 0; renderPin(c); }))
+      .catch(()=>{ err.textContent="Couldn't save the PIN. Use 4-8 digits."; err.hidden=false; btn.textContent=label; syncPinBtn(); });
+  }
+  $("admPin").addEventListener("input",()=>{ const i=$("admPin"); i.value=i.value.replace(/\D/g,"").slice(0,8); $("admPinErr").hidden=true; syncPinBtn(); });
+  $("admPin").addEventListener("keydown",e=>{ if(e.key==="Enter" && !$("admPinSave").disabled) $("admPinSave").click(); });
+  $("admPinSave").addEventListener("click",()=>savePin($("admPin").value, $("admPinSave"), "saving…"));
+  $("admPinOff").addEventListener("click",()=>savePin("", $("admPinOff"), "turning off…"));
+
+  let booted=false;
+  function boot(){
+    booted=true;
+    $("qr").src = "/qr"; // scan-to-join QR of the shareable hub URL (shown for everyone)
+    loadFiles();
+    checkAdmin();
+    connect();
+    setInterval(loadStatus, 15000); // keep uptime / connected count fresh
+    setInterval(loadBrowseInfo, 15000); // pick up the host enabling/disabling browsing
+  }
+  checkAuth().then(ok=>{ if(ok) boot(); });
 </script>
 </body>
 </html>

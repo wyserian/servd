@@ -1,6 +1,7 @@
 package dev.servd.host
 
 import dev.servd.core.Servd
+import dev.servd.core.auth.JoinPin
 import dev.servd.core.discovery.MdnsAdvertiser
 import dev.servd.core.discovery.MdnsBrowser
 import dev.servd.core.net.detectLanAddress
@@ -30,6 +31,7 @@ import kotlin.system.exitProcess
  *   servd [start] [--port N] [--host IP] [--dir PATH] [--no-open]   start the hub
  *       [--browse-dir PATH [--browse-write]]                        also serve a folder to clients
  *       [--proxy-target URL [--proxy-port N]]                       also re-serve a live web app
+ *       [--pin DIGITS | --pin off]                                  set (and save) or clear the join PIN
  *   servd discover                                                  find hubs on the network
  */
 fun main(args: Array<String>) {
@@ -88,7 +90,16 @@ fun main(args: Array<String>) {
         browseWritable = opts.browseWrite,
         proxyTarget = opts.proxyTarget,
         proxyPort = opts.proxyPort,
+        pinFile = File(dataDir, "join.pin"),
     )
+    when (opts.pin) {
+        null -> {}
+        "off" -> server.joinPin.set(null)
+        else -> if (JoinPin.isValid(opts.pin)) server.joinPin.set(opts.pin) else {
+            println("--pin must be 4-8 digits (or \"off\").")
+            exitProcess(1)
+        }
+    }
 
     // When bound to all interfaces, the host reaches admin via loopback; a specific --host
     // means admin is only available if that host is itself loopback.
@@ -105,6 +116,7 @@ fun main(args: Array<String>) {
     println("cert    : self-signed, SHA-256 fingerprint:")
     println("          ${tls.fingerprintSha256}")
     println("keystore: ${tls.file}")
+    server.joinPin.current?.let { println("join PIN: $it   (other devices must enter it)") }
     println()
     // Advertise over mDNS so other devices can find this hub without typing an IP.
     val advertiser = MdnsAdvertiser()
@@ -240,6 +252,7 @@ private data class Opts(
     val browseWrite: Boolean = false,
     val proxyTarget: String? = null,
     val proxyPort: Int = 8080,
+    val pin: String? = null,
 ) {
     companion object {
         fun parse(args: Array<String>): Opts {
@@ -251,6 +264,7 @@ private data class Opts(
             var browseWrite = false
             var proxyTarget: String? = null
             var proxyPort = 8080
+            var pin: String? = null
             var i = 0
             while (i < args.size) {
                 when (args[i]) {
@@ -263,10 +277,11 @@ private data class Opts(
                     "--browse-write" -> browseWrite = true
                     "--proxy-target" -> proxyTarget = args.getOrNull(++i)
                     "--proxy-port" -> proxyPort = args.getOrNull(++i)?.toIntOrNull() ?: proxyPort
+                    "--pin" -> pin = args.getOrNull(++i)
                 }
                 i++
             }
-            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort)
+            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort, pin)
         }
     }
 }

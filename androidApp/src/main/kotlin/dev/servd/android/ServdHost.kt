@@ -81,6 +81,7 @@ object ServdHost {
             hostName = deviceName(),
             interfaceName = lan?.interfaceName,
             pickerRoots = storagePickerRoots(),
+            pinFile = File(dataDir, "join.pin"),
         )
         srv.start(wait = false)
         server = srv

@@ -1,7 +1,9 @@
 package dev.servd.core.chat
 
+import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
+import io.ktor.websocket.close
 import io.ktor.websocket.send
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,6 +71,13 @@ class ChatHub(private val serverName: String) {
 
     /** Number of live dashboard connections. */
     fun connectionCount(): Int = conns.size
+
+    /** Close every connection from an address matching [predicate] (e.g. sign-out on a PIN change). */
+    suspend fun closeWhere(predicate: (address: String) -> Boolean) {
+        for (conn in conns.values) if (predicate(conn.address)) {
+            runCatching { conn.session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "signed out")) }
+        }
+    }
 
     /** Broadcast that a file was shared, so every connected dashboard updates live. */
     suspend fun announceFile(meta: FileMeta) {

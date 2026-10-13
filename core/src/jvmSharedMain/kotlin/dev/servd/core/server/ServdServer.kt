@@ -1,6 +1,7 @@
 package dev.servd.core.server
 
 import dev.servd.core.Servd
+import dev.servd.core.auth.JoinPin
 import dev.servd.core.browse.Browser
 import dev.servd.core.proxy.WebProxy
 import dev.servd.core.chat.ChatHub
@@ -15,6 +16,8 @@ import dev.servd.core.service.Service
 import dev.servd.core.service.ServiceManager
 import dev.servd.core.tls.TlsKeyStore
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -29,7 +32,9 @@ import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
 import io.ktor.server.plugins.origin
+import io.ktor.server.request.path
 import io.ktor.server.request.receiveMultipart
+import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -87,8 +92,13 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     proxyTarget: String? = null,
     /** Dedicated port the reverse proxy listens on. */
     proxyPort: Int = 8080,
+    /** Where the optional join PIN is persisted; null keeps it in memory only. */
+    pinFile: File? = null,
 ) {
     val url: String get() = "https://$advertisedHost:$port"
+
+    /** Optional join PIN (off by default); the host can also set it before [start]. */
+    val joinPin = JoinPin(pinFile)
 
     private val startedAt = System.currentTimeMillis()
     private val chatHub = ChatHub(serverName = advertisedHost)
@@ -97,7 +107,8 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
         b.pickerRoots = pickerRoots.map { (label, path) -> Browser.PickerDir(label, path) }
         if (browseDir != null) runCatching { b.enable(browseDir, browseWritable) }
     }
-    private val webProxy = WebProxy(engineFactory, bindHost, advertisedHost, tls).also { p ->
+    // Cookies ignore ports, so the hub's session cookie also unlocks the proxy's port.
+    private val webProxy = WebProxy(engineFactory, bindHost, advertisedHost, tls, allows = { it.mayUseHub() }, hubUrl = url).also { p ->
         if (proxyTarget != null) runCatching { p.enable(proxyTarget, proxyPort) }
     }
     private val serviceManager = ServiceManager(listOf(HttpService(port)) + extraServices)
@@ -134,9 +145,46 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
         engine.stop(gracePeriodMillis = 300, timeoutMillis = 1500)
     }
 
+    /** The host (loopback) always may; other devices need a valid session while a PIN is set. */
+    private fun ApplicationCall.mayUseHub(): Boolean =
+        isLoopbackClient() || joinPin.allows(request.cookies[JoinPin.COOKIE])
+
     private fun Application.servdModule() {
         install(WebSockets)
+        // Join PIN gate: while a PIN is set, everything except the page itself and the PIN check
+        // needs a session - including the chat socket, files, browse, QR and status.
+        intercept(ApplicationCallPipeline.Plugins) {
+            if (call.request.path() !in PIN_OPEN_PATHS && !call.mayUseHub()) {
+                call.respond(HttpStatusCode.Unauthorized)
+                finish()
+            }
+        }
         routing {
+            get("/auth") {
+                val required = joinPin.enabled && !call.isLoopbackClient()
+                call.respondText("""{"required":$required,"ok":${call.mayUseHub()}}""", ContentType.Application.Json)
+            }
+            post("/auth") {
+                val entered = call.receiveParameters()["pin"].orEmpty()
+                when (val r = joinPin.attempt(call.request.origin.remoteAddress, entered)) {
+                    is JoinPin.Attempt.Ok -> {
+                        // Written by hand: Ktor's cookie renderer appends a non-standard "$x-enc" attribute.
+                        // The token is base64url, so it needs no encoding. Port-agnostic, so it also
+                        // unlocks the serve-site port.
+                        call.response.header(
+                            HttpHeaders.SetCookie,
+                            "${JoinPin.COOKIE}=${r.token}; Max-Age=${30 * 24 * 3600}; Path=/; Secure; HttpOnly; SameSite=Lax",
+                        )
+                        call.respondText("""{"ok":true}""", ContentType.Application.Json)
+                    }
+                    is JoinPin.Attempt.Wrong -> call.respondText(
+                        """{"ok":false,"triesLeft":${r.triesLeft}}""", ContentType.Application.Json, HttpStatusCode.Unauthorized,
+                    )
+                    is JoinPin.Attempt.Locked -> call.respondText(
+                        """{"ok":false,"retryAfterMs":${r.retryAfterMs}}""", ContentType.Application.Json, HttpStatusCode.TooManyRequests,
+                    )
+                }
+            }
             // Real-time chat + presence. Clients connect, say hello (name), then exchange chat.
             webSocket("/ws") {
                 val address = call.request.origin.remoteAddress // raw IP, no reverse-DNS
@@ -353,6 +401,21 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                     ContentType.Application.Json,
                 )
             }
+            // Join PIN, host-only. Setting, changing or clearing it signs every other device out.
+            get("/admin/pin") {
+                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
+                call.respondText(pinConfig(), ContentType.Application.Json)
+            }
+            post("/admin/pin") {
+                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
+                val pin = call.receiveParameters()["pin"]?.trim().orEmpty().ifEmpty { null }
+                if (pin != null && !JoinPin.isValid(pin)) {
+                    return@post call.respondText(pinConfig(), ContentType.Application.Json, HttpStatusCode.BadRequest)
+                }
+                joinPin.set(pin)
+                if (pin != null) chatHub.closeWhere { !isLoopback(it) } // drop now-unauthorised chats
+                call.respondText(pinConfig(), ContentType.Application.Json)
+            }
             // Reverse proxy (re-serve a host-run web app to the LAN), host-only.
             get("/admin/proxy") {
                 if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
@@ -404,7 +467,13 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
         }
     }
+
+    private fun pinConfig(): String =
+        """{"enabled":${joinPin.enabled},"pin":${joinPin.current?.let { "\"$it\"" } ?: "null"}}"""
 }
+
+/** Reachable without a session while a join PIN is set: the page (it shows the PIN screen) and the check. */
+private val PIN_OPEN_PATHS = setOf("/", "/auth")
 
 /** [name], or "name (2).ext", "name (3).ext"… if already in [used]. Records the result in [used]. */
 private fun uniqueName(name: String, used: MutableSet<String>): String {
@@ -419,6 +488,8 @@ private fun uniqueName(name: String, used: MutableSet<String>): String {
 }
 
 /** True only when the request came from this machine (loopback), gating the admin API. */
-private fun ApplicationCall.isLoopbackClient(): Boolean =
-    runCatching { InetAddress.getByName(request.origin.remoteAddress).isLoopbackAddress }
-        .getOrDefault(false)
+private fun ApplicationCall.isLoopbackClient(): Boolean = isLoopback(request.origin.remoteAddress)
+
+/** [address] is a raw IP (no DNS lookup happens) on this machine's loopback. */
+private fun isLoopback(address: String): Boolean =
+    runCatching { InetAddress.getByName(address).isLoopbackAddress }.getOrDefault(false)

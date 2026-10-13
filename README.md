@@ -18,8 +18,9 @@ The host serves one HTTPS dashboard. It offers chat, file sharing, a shared host
 reverse proxy for a running web app, plus optional SSH/SFTP and FTPS servers. Each feature is a
 tab. The tabs that configure the host appear only on the host itself.
 
-- **Trusted-LAN tool:** there's no account or PIN, and admin controls work only on the host
-  device. SSH/FTP use real credentials. See [Security](#security).
+- **Trusted-LAN tool:** there are no accounts, and admin controls work only on the host device.
+  On shared Wi-Fi the host can turn on an optional join PIN. SSH/FTP use real credentials. See
+  [Security](#security).
 - **Fully offline:** servd talks only to devices on your network. The dashboard is
   self-contained, with no CDN, webfonts, analytics or telemetry, and it works on a hotspot with no
   uplink. Internet is needed only for the first source build, to download dependencies.
@@ -53,6 +54,9 @@ tab. The tabs that configure the host appear only on the host itself.
   limited to the shared files. There's no OS shell. Each tab shows a copyable connect command.
 - **Easy joining:** a scan-to-join QR code, plus mDNS discovery (`_servd._tcp`, or run
   `servd discover`).
+- **Join PIN** (optional): the host sets a 4-8 digit PIN, and other devices must enter it before
+  they can use the hub, including the serve-site port. It's saved across restarts until turned
+  off. Changing it signs everyone out.
 - **Host-only tabs:** browse setup, serve site, ssh and ftp, plus a host card with the fingerprint.
   These are served only on loopback, each with a dot showing whether it's live.
 - **Desktop CLI:** starts the hub, prints the fingerprint, and opens the dashboard.
@@ -143,8 +147,13 @@ so even an HTTP-only or localhost-only app is reachable and encrypted across the
 | `8080` | serve site (only while serving; configurable) |
 
 All ports are non-privileged. SSH and FTP share one generated credential, username `servd`. Data
-(keystore, shared files, credential) lives in `~/.servd` on desktop, and in the app's private
-storage on Android.
+(keystore, shared files, credential, join PIN) lives in `~/.servd` on desktop, and in the app's
+private storage on Android.
+
+**Join PIN:** set it in the **This host** card (or with `--pin`). The host itself never needs it.
+Other devices see a PIN screen first, then stay signed in for 30 days, until the PIN changes or the
+hub restarts. After 5 wrong tries a device is locked out for 30 s, and the wait doubles with each
+further miss.
 
 ### Command-Line Options
 
@@ -163,22 +172,28 @@ servd discover            # find hubs on the network without typing an IP
 | `--browse-write` | allow uploads to that folder | read-only |
 | `--proxy-target URL` | serve a running site on start | off |
 | `--proxy-port N` | serve-site port | `8080` |
+| `--pin DIGITS` / `--pin off` | set (and save) or clear the join PIN | saved PIN, else off |
 
 ## Security
 
 servd is built for a **trusted LAN**, and these limits are deliberate:
 
-- **Client routes** (dashboard, chat, files, roster) are bound to the LAN interface and open to the
-  network, with no PIN or account. Anyone who can reach the hub and accepts the certificate can use
-  them.
-- **Admin routes** (`/admin/*`: service toggles, host info, certificate, folder and proxy setup)
-  answer only on **loopback**. Only the host device can change settings.
+- **Client routes** (dashboard, chat, files, roster) are bound to the LAN interface. By default
+  they're open to the network, with no account: anyone who can reach the hub and accepts the
+  certificate can use them.
+- **Join PIN** (optional) gates every client route except the page itself and the PIN check, and
+  the serve-site port too. A correct PIN gives a random session cookie (`Secure`, `HttpOnly`,
+  `SameSite=Lax`), kept in memory, so a restart or a PIN change signs everyone out. Wrong guesses
+  are rate-limited per device. It's a 4-8 digit PIN against casual access on shared networks, not a
+  strong password.
+- **Admin routes** (`/admin/*`: service toggles, host info, certificate, join PIN, folder and proxy
+  setup) answer only on **loopback**. Only the host device can change settings.
 - **SSH/FTP** always require the password; there's no anonymous login. FTP uses explicit TLS
   (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
 - **Browse files** is off by default and set up only from the host. Clients can't go above the
   chosen folder, and uploads are refused unless the host allows them.
 - **Serve site** is off by default and set up only from the host. While it's on, the target app is
-  open to the LAN without a login, on its own port. Stopping it closes that port.
+  open to the LAN on its own port, behind the join PIN if one is set. Stopping it closes that port.
 - **Encryption** covers the network hop, checked by fingerprint. It is **not end to end**: the
   host can see the traffic, as expected for a hub.
 
@@ -210,17 +225,19 @@ servd/
     `HttpService` (always on), `SshService` and `FtpService`.
   - `ServiceManager` starts, stops and toggles services, one call at a time.
   - `ChatHub` tracks who's connected and broadcasts chat, join/leave and roster events.
+  - `JoinPin` (`jvmSharedMain`) holds the optional PIN, the sessions and the per-device lockout.
 - **Request flow**:
 
   | Area | Routes |
   |---|---|
   | Dashboard | `GET /` |
+  | Join PIN | `GET /auth` state · `POST /auth` check PIN, set session cookie |
   | Host status | `GET /status`: host info + fingerprint |
   | Chat | WebSocket `/ws`: announce a name, then chat |
   | Drop files | `POST /files` upload · `GET /files` list · `GET /files/{id}` · `GET /files/zip` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
   | Live site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
-  | Admin (loopback only) | `/admin/*`, incl. `/admin/browse*` and `/admin/proxy` |
+  | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/browse*` and `/admin/proxy` |
 
 - **Out of scope**: Bluetooth (Wi-Fi/hotspot only), a native Compose UI, end-to-end encryption,
   scanning the whole LAN (the roster is the hub's peers plus mDNS hub discovery), and an external
