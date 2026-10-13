@@ -61,8 +61,19 @@ class FileStore(
         return minOf(disk, quota).coerceAtLeast(0)
     }
 
-    /** Stream [input] to disk and record it. Returns the stored metadata. */
-    fun save(originalName: String, contentType: String?, fromName: String, input: InputStream): FileMeta {
+    /**
+     * Stream [input] to disk and record it. Returns the stored metadata. For a file from a dropped
+     * folder, [path] is its path inside that folder and [batch] groups the drop; both are
+     * sanitized, and dropped (the file is stored loose) if invalid.
+     */
+    fun save(
+        originalName: String,
+        contentType: String?,
+        fromName: String,
+        input: InputStream,
+        path: String? = null,
+        batch: String? = null,
+    ): FileMeta {
         if (room() <= 0) throw StorageFullException(usage())
         val id = UUID.randomUUID().toString()
         val target = File(dir, id)
@@ -102,7 +113,11 @@ class FileStore(
             contentType = contentType,
             fromName = fromName,
             ts = System.currentTimeMillis(),
-        )
+        ).let { m ->
+            val cleanBatch = batch?.takeIf { BATCH_ID.matches(it) }
+            val cleanPath = cleanBatch?.let { sanitizePath(path) }
+            if (cleanPath != null) m.copy(path = cleanPath, batch = cleanBatch) else m
+        }
         metas[id] = meta
         stored.addAndGet(meta.size)
         return meta
@@ -121,6 +136,13 @@ class FileStore(
 
     /** Every stored file (newest first) with its backing file - for "download all". */
     fun entries(): List<Pair<FileMeta, File>> = list().mapNotNull { get(it.id) }
+
+    /** The files of one folder drop, with their backing files. */
+    fun batchEntries(batch: String): List<Pair<FileMeta, File>> = entries().filter { it.first.batch == batch }
+
+    /** Delete every file of one folder drop. Returns what was removed. */
+    fun removeBatch(batch: String): List<FileMeta> =
+        metas.values.filter { it.batch == batch }.mapNotNull { remove(it.id) }
 
     /** Delete one file (bytes + metadata). Returns its metadata, or null if unknown. */
     fun remove(id: String): FileMeta? {
@@ -147,6 +169,22 @@ class FileStore(
         name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "file" }.take(120)
 
     companion object {
+        /**
+         * A folder-relative path made safe for display and for zip entries: "/" separators only,
+         * no empty, "." or ".." segments (so nothing can climb out of an extracted zip), no
+         * characters Windows rejects. Null unless it is at least "folder/file".
+         */
+        fun sanitizePath(path: String?): String? {
+            if (path.isNullOrBlank()) return null
+            val parts = path.replace('\\', '/').split('/')
+                .map { seg -> seg.trim().replace(UNSAFE_CHARS, "_").take(120) }
+                .filter { it.isNotEmpty() && it != "." && it != ".." }
+            if (parts.size < 2) return null
+            return parts.joinToString("/").take(1000)
+        }
+
+        private val UNSAFE_CHARS = Regex("""[\u0000-\u001f:*?"<>|]""")
+        private val BATCH_ID = Regex("[A-Za-z0-9-]{8,64}")
         const val MIN_FREE_BYTES = 1L shl 30 // 1 GB
         private const val DISK_CHECK_BYTES = 8L shl 20 // re-check free space every 8 MB written
         private val ID_NAME = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")

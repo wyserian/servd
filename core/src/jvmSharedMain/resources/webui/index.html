@@ -195,6 +195,16 @@
   .drop .big { color: var(--accent); }
   .drop strong { font-family: var(--mono); font-weight: 700; color: var(--ink); }
   .drop small { font-family: var(--mono); color: var(--faint); }
+  .linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .frow.folder { cursor: pointer; }
+  .frow.folder:hover { background: color-mix(in srgb, var(--accent) 5%, var(--surface-2)); }
+  .frow.folder.open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .fsubs { margin-top: -8px; padding: 2px 12px 8px 58px; background: var(--surface-2); border-radius: 0 0 var(--r-sm) var(--r-sm); display: flex; flex-direction: column; gap: 2px; }
+  .fsubrow { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+  .fsubrow .fsubname { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fsubrow .fsize { font-family: var(--mono); font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fsubrow .dl { width: 26px; height: 26px; }
+  .fsubrow.more { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
   .drop-foot { display: flex; flex-direction: column; gap: 4px; margin-top: -6px; }
   .drop-usage { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
   .drop-usage:empty { display: none; }
@@ -441,9 +451,10 @@
             <label class="drop" id="drop">
               <input type="file" id="fileInput" multiple hidden />
               <span class="big"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg></span>
-              <strong>Drop files here to share</strong>
-              <small>or click to browse - sent to every device on the hub</small>
+              <strong>Drop files or folders here to share</strong>
+              <small>or click to pick files, or <button type="button" class="linkish" id="pickFolder">pick a folder</button> - sent to every device on the hub</small>
             </label>
+            <input type="file" id="folderInput" webkitdirectory multiple hidden />
             <div class="drop-foot">
               <span class="drop-usage" id="dropUsage"></span>
               <div class="form-err" id="dropErr" role="alert" hidden></div>
@@ -572,7 +583,7 @@
   setTitle();
   let selfId=null, ws=null, retry=null, lastConnected=0;
   const files = new Map();
-  const uploads = new Map(); let upSeq = 0; // in-flight uploads: id -> {name,size,loaded,xhr}
+  const uploads = new Map(); let upSeq = 0; // upload rows (a loose file, or a whole dropped folder): id -> state
 
   // theme
   (function(){ const t=localStorage.getItem("servd-theme"); if(t) document.documentElement.setAttribute("data-theme",t); })();
@@ -654,48 +665,111 @@
       '<a class="bubble file-msg" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'"><span class="fi">'+FILEICON+'</span>shared <b>'+esc(f.name)+'</b> &middot; '+fmtSize(f.size)+'</a>';
     log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
   }
+  // A dropped folder is one chat message, updated as its files arrive.
+  const folderMsgs=new Map(); // batch -> {el, count, size}
+  function addFolderMsg(f){
+    let m=folderMsgs.get(f.batch);
+    if(!m){
+      const stick=atBottom(); const mine=f.fromName===userName;
+      const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
+      const who = mine ? "you" : esc(f.fromName);
+      const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
+      el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(f.ts)+'</span></div>'+
+        '<a class="bubble file-msg" href="/files/zip?batch='+encodeURIComponent(f.batch)+'" download><span class="fi">'+FICON+'</span>shared <b>'+esc(topName(f))+'/</b> &middot; <span class="fcount"></span></a>';
+      log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
+      m={el,count:0,size:0}; folderMsgs.set(f.batch,m);
+    }
+    m.count++; m.size+=f.size;
+    m.el.querySelector(".fcount").textContent = m.count+" file"+(m.count===1?"":"s")+" · "+fmtSize(m.size);
+  }
 
   // ---- files ----
+  // Files from one folder drop share a batch id and show as one folder row (click to list its files).
+  const openFolders=new Set();
+  function topName(f){ return f.path ? f.path.split("/")[0] : f.name; }
+  function groupFiles(){
+    const groups=new Map(), out=[];
+    for(const f of [...files.values()].sort((a,b)=>b.ts-a.ts)){
+      if(!f.batch){ out.push({kind:"file", f}); continue; }
+      let g=groups.get(f.batch);
+      if(!g){ g={kind:"folder", batch:f.batch, name:topName(f), fromName:f.fromName, ts:f.ts, size:0, files:[]}; groups.set(f.batch,g); out.push(g); }
+      g.files.push(f); g.size+=f.size;
+    }
+    for(const g of groups.values()) g.files.sort((a,b)=>a.path.localeCompare(b.path, undefined, {numeric:true})); // img2 before img10
+    return out;
+  }
   function renderFiles(){
-    const items=[...files.values()].sort((a,b)=>b.ts-a.ts);
+    const groups=groupFiles();
     const ups=[...uploads.entries()];
-    fbadge.style.display = items.length ? "" : "none"; fbadge.textContent=items.length;
-    $("filesDot").classList.toggle("on", items.length>0);
-    $("dlAllBtn").disabled = !items.length; // nothing to download yet
-    if(!items.length && !ups.length){ flist.innerHTML='<div class="files-empty">No files shared yet.</div>'; return; }
+    fbadge.style.display = groups.length ? "" : "none"; fbadge.textContent=groups.length;
+    $("filesDot").classList.toggle("on", groups.length>0);
+    $("dlAllBtn").disabled = !groups.length; // nothing to download yet
+    if(!groups.length && !ups.length){ flist.innerHTML='<div class="files-empty">No files shared yet.</div>'; return; }
     flist.innerHTML="";
     for(const [id,u] of ups){
-      const pct=u.size?Math.min(100,Math.round(u.loaded/u.size*100)):0;
+      const s=upStatus(u);
       const row=document.createElement("div"); row.className="frow uploading"; row.dataset.up=id;
-      row.innerHTML='<span class="fi">'+esc(ext(u.name))+'</span>'+
-        '<div class="fmeta"><div class="fname">'+esc(u.name)+'</div><div class="fsub upsub">uploading&hellip; '+pct+'%</div><div class="uprog"><div class="upbar" style="width:'+pct+'%"></div></div></div>'+
-        '<span class="fsize upsize">'+fmtSize(u.loaded)+' / '+fmtSize(u.size)+'</span>'+
-        '<button class="dl del" data-cancel="'+id+'" title="Cancel upload">'+XICON+'</button>';
+      row.innerHTML='<span class="fi">'+(u.folder ? FICON : esc(ext(u.name)))+'</span>'+
+        '<div class="fmeta"><div class="fname">'+esc(u.name)+(u.folder?'/':'')+'</div><div class="fsub upsub">'+esc(s.text)+'</div><div class="uprog"><div class="upbar" style="width:'+s.pct+'%"></div></div></div>'+
+        '<span class="fsize upsize">'+s.size+'</span>'+
+        '<button class="dl del" data-cancel="'+id+'" title="'+(u.folder?'Cancel the rest of this folder':'Cancel upload')+'">'+XICON+'</button>';
       flist.appendChild(row);
     }
-    for(const f of items){
-      const row=document.createElement("div"); row.className="frow";
-      row.innerHTML='<span class="fi">'+esc(ext(f.name))+'</span>'+
-        '<div class="fmeta"><div class="fname">'+esc(f.name)+'</div><div class="fsub">from '+esc(f.fromName)+' &middot; '+time(f.ts)+'</div></div>'+
-        '<span class="fsize">'+fmtSize(f.size)+'</span>'+
-        '<a class="dl" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'" title="Download">'+DLICON+'</a>'+
-        '<button class="dl del" data-del="'+esc(f.id)+'" title="Delete">'+XICON+'</button>';
+    for(const g of groups){
+      const row=document.createElement("div");
+      if(g.kind==="file"){
+        const f=g.f; row.className="frow";
+        row.innerHTML='<span class="fi">'+esc(ext(f.name))+'</span>'+
+          '<div class="fmeta"><div class="fname">'+esc(f.name)+'</div><div class="fsub">from '+esc(f.fromName)+' &middot; '+time(f.ts)+'</div></div>'+
+          '<span class="fsize">'+fmtSize(f.size)+'</span>'+
+          '<a class="dl" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'" title="Download">'+DLICON+'</a>'+
+          '<button class="dl del" data-del="'+esc(f.id)+'" title="Delete">'+XICON+'</button>';
+        flist.appendChild(row); continue;
+      }
+      const open=openFolders.has(g.batch), n=g.files.length;
+      row.className="frow folder"+(open?" open":""); row.dataset.folder=g.batch;
+      row.setAttribute("aria-expanded", open); row.title = open ? "Hide the files" : "Show the files";
+      row.innerHTML='<span class="fi">'+FICON+'</span>'+
+        '<div class="fmeta"><div class="fname">'+esc(g.name)+'/</div><div class="fsub">'+n+' file'+(n===1?'':'s')+' &middot; from '+esc(g.fromName)+' &middot; '+time(g.ts)+'</div></div>'+
+        '<span class="fsize">'+fmtSize(g.size)+'</span>'+
+        '<a class="dl" href="/files/zip?batch='+encodeURIComponent(g.batch)+'" download title="Download the folder as a zip">'+DLICON+'</a>'+
+        '<button class="dl del" data-delbatch="'+esc(g.batch)+'" data-n="'+n+'" title="Delete the folder">'+XICON+'</button>';
       flist.appendChild(row);
+      if(open){
+        const sub=document.createElement("div"); sub.className="fsubs";
+        const shown=g.files.slice(0,500);
+        sub.innerHTML = shown.map(f=>'<div class="fsubrow"><span class="fsubname" title="'+esc(f.path)+'">'+esc(f.path.slice(g.name.length+1))+'</span>'+
+            '<span class="fsize">'+fmtSize(f.size)+'</span>'+
+            '<a class="dl" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'" title="Download">'+DLICON+'</a></div>').join("")+
+          (n>shown.length ? '<div class="fsubrow more">and '+(n-shown.length)+' more - download the zip for everything</div>' : '');
+        flist.appendChild(sub);
+      }
     }
     flist.querySelectorAll('button[data-del]').forEach(b=>b.addEventListener('click',()=>{
       if(confirm('Delete this file for everyone?')) fetch('/files/'+encodeURIComponent(b.dataset.del),{method:'DELETE'}).catch(()=>{});
     }));
-    flist.querySelectorAll('button[data-cancel]').forEach(b=>b.addEventListener('click',()=>{ const u=uploads.get(b.dataset.cancel); if(u&&u.xhr) u.xhr.abort(); }));
+    flist.querySelectorAll('button[data-delbatch]').forEach(b=>b.addEventListener('click',()=>{
+      if(confirm('Delete this folder ('+b.dataset.n+' files) for everyone?')) fetch('/files/batch/'+encodeURIComponent(b.dataset.delbatch),{method:'DELETE'}).catch(()=>{});
+    }));
+    flist.querySelectorAll('.frow.folder').forEach(r=>r.addEventListener('click',e=>{
+      if(e.target.closest('a,button')) return;
+      const b=r.dataset.folder; if(openFolders.has(b)) openFolders.delete(b); else openFolders.add(b);
+      renderFiles();
+    }));
+    flist.querySelectorAll('button[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelUpload(b.dataset.cancel)));
   }
   function updateUpRow(id){
     const u=uploads.get(id); if(!u) return;
     const row=flist.querySelector('[data-up="'+id+'"]'); if(!row) return;
-    const pct=u.size?Math.min(100,Math.round(u.loaded/u.size*100)):0;
-    const bar=row.querySelector('.upbar'); if(bar) bar.style.width=pct+'%';
-    const sub=row.querySelector('.upsub'); if(sub) sub.textContent='uploading… '+pct+'%';
-    const sz=row.querySelector('.upsize'); if(sz) sz.textContent=fmtSize(u.loaded)+' / '+fmtSize(u.size);
+    const s=upStatus(u);
+    const bar=row.querySelector('.upbar'); if(bar) bar.style.width=s.pct+'%';
+    const sub=row.querySelector('.upsub'); if(sub) sub.textContent=s.text;
+    const sz=row.querySelector('.upsize'); if(sz) sz.textContent=s.size;
   }
-  function addFile(f, announce){ const isNew=!files.has(f.id); files.set(f.id,f); renderFiles(); if(isNew&&announce) addFileMsg(f); }
+  function addFile(f, announce){
+    const isNew=!files.has(f.id); files.set(f.id,f); renderFiles();
+    if(isNew&&announce){ if(f.batch) addFolderMsg(f); else addFileMsg(f); }
+  }
   function loadFiles(){ fetch("/files").then(r=>r.json()).then(list=>{ list.forEach(f=>files.set(f.id,f)); renderFiles(); }).catch(()=>{}); }
   // ---- drop-files storage: usage line, and refusing what can't fit before uploading it ----
   let usage=null;
@@ -716,35 +790,162 @@
     dropErr("Not enough space on the hub for "+(names.length===1 ? '"'+names[0]+'"' : names.length+" files")+" ("+free+").");
   }
 
-  function upload(fileList){
+  // ---- uploads: one row per loose file or per dropped folder; at most MAX_PARALLEL files in flight ----
+  const MAX_PARALLEL=3;
+  const upQueue=[]; let upActive=0; // queued files: {id (row), file, path, batch}
+  const JUNK=/^(\.DS_Store|Thumbs\.db|desktop\.ini)$/i; // OS clutter inside dropped folders
+
+  function upLoaded(u){ let s=u.doneBytes; for(const l of u.xhrs.values()) s+=l; return s; }
+  function upRate(u){ // bytes per second over the last ~4 s
+    const now=performance.now(), cur=upLoaded(u);
+    u.samples.push([now,cur]);
+    while(u.samples.length>2 && now-u.samples[0][0]>4000) u.samples.shift();
+    const [t0,b0]=u.samples[0], dt=(now-t0)/1000;
+    return dt>=1 ? (cur-b0)/dt : 0;
+  }
+  function fmtEta(s){
+    if(!isFinite(s)||s<1) return "";
+    if(s<60) return "~"+Math.ceil(s)+"s left";
+    if(s<3600) return "~"+Math.ceil(s/60)+" min left";
+    return "~"+(s/3600).toFixed(1)+" h left";
+  }
+  function upStatus(u){
+    const loaded=upLoaded(u);
+    const pct=u.totalBytes ? Math.min(100,Math.floor(loaded/u.totalBytes*100)) : 0;
+    const bits=[];
+    if(u.folder) bits.push(u.doneFiles+" of "+u.totalFiles+" files");
+    if(!u.xhrs.size && !u.doneFiles) bits.push("waiting…");
+    else {
+      bits.push(pct+"%");
+      const rate=upRate(u);
+      if(rate>0){ bits.push(fmtSize(rate)+"/s"); const eta=fmtEta((u.totalBytes-loaded)/rate); if(eta) bits.push(eta); }
+    }
+    return {pct, text:bits.join(" · "), size:fmtSize(loaded)+" / "+fmtSize(u.totalBytes)};
+  }
+  function newBatchId(){ const a=new Uint8Array(12); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
+
+  function startUpload(items, folderName){ // items: [{file, path}]
+    const id="up-"+(upSeq++), batch = folderName ? newBatchId() : null;
+    uploads.set(id,{ name: folderName || items[0].file.name, folder: !!folderName,
+      totalFiles: items.length, totalBytes: items.reduce((s,i)=>s+i.file.size,0),
+      doneFiles: 0, doneBytes: 0, failed: [], xhrs: new Map(), cancelled: false, samples: [] });
+    for(const it of items) upQueue.push({id, file:it.file, path:it.path, batch});
+    renderFiles(); pump();
+  }
+  function pump(){
+    while(upActive<MAX_PARALLEL && upQueue.length){
+      const t=upQueue.shift(), u=uploads.get(t.id);
+      if(u && !u.cancelled) sendOne(t,u);
+    }
+  }
+  function sendOne(t,u){
+    upActive++;
+    const xhr=new XMLHttpRequest(); u.xhrs.set(xhr,0);
+    let settled=false;
+    const done=ok=>{
+      if(settled) return; settled=true;
+      upActive--; u.xhrs.delete(xhr);
+      if(ok){ u.doneFiles++; u.doneBytes+=t.file.size; }
+      finishIfDone(t.id,u); pump();
+    };
+    xhr.upload.addEventListener("progress",e=>{ if(u.xhrs.has(xhr)){ u.xhrs.set(xhr,Math.min(e.loaded,t.file.size)); updateUpRow(t.id); } });
+    xhr.addEventListener("load",()=>{
+      if(xhr.status>=200&&xhr.status<300) return done(true); // the file itself arrives via the /ws announce
+      if(xhr.status===413){ // hub full: stop this row (the rest wouldn't fit either)
+        try{ renderUsage(JSON.parse(xhr.responseText)); }catch{}
+        if(!u.cancelled){ noRoom([u.name+(u.folder?"/":"")]); stopRow(t.id,u,xhr); }
+      } else u.failed.push(t.path||t.file.name);
+      done(false);
+    });
+    xhr.addEventListener("error",()=>{ u.failed.push(t.path||t.file.name); done(false); });
+    xhr.addEventListener("abort",()=>done(false));
+    const fd=new FormData(); fd.append("from",userName);
+    if(t.batch){ fd.append("path",t.path); fd.append("batch",t.batch); } // before the file: the server reads parts in order
+    fd.append("file",t.file,t.file.name);
+    xhr.open("POST","/files"); xhr.send(fd);
+  }
+  // Drop the row's queued files and abort its in-flight ones (except [keep], already finished).
+  function stopRow(id,u,keep){
+    u.cancelled=true;
+    for(let i=upQueue.length-1;i>=0;i--) if(upQueue[i].id===id) upQueue.splice(i,1);
+    for(const x of [...u.xhrs.keys()]) if(x!==keep) x.abort();
+  }
+  function cancelUpload(id){ const u=uploads.get(id); if(!u) return; stopRow(id,u,null); finishIfDone(id,u); }
+  function finishIfDone(id,u){
+    if(!uploads.has(id) || u.xhrs.size || upQueue.some(t=>t.id===id)) return;
+    uploads.delete(id);
+    if(u.failed.length) dropErr(u.folder
+      ? u.failed.length+" of "+u.totalFiles+" files in "+u.name+"/ failed to upload."
+      : '"'+u.name+'" failed to upload.');
+    renderFiles();
+  }
+
+  // Accepts loose files and folder files: [{file, path}], path = "folder/sub/name" for folder files.
+  // Each top folder becomes one upload row; anything that can't fit is refused before it starts.
+  function upload(entries){
     dropErr("");
-    let budget = usage ? usage.roomBytes : Infinity;
+    const loose=[], folders=new Map();
+    for(const e of entries){
+      if(e.path && e.path.includes("/")){
+        if(JUNK.test(e.file.name)) continue;
+        const top=e.path.split("/")[0];
+        if(!folders.has(top)) folders.set(top,[]);
+        folders.get(top).push(e);
+      } else loose.push({file:e.file, path:null});
+    }
+    let pending=0; for(const u of uploads.values()) if(!u.cancelled) pending+=u.totalBytes-upLoaded(u);
+    let budget = usage ? usage.roomBytes-pending : Infinity;
     const skipped=[];
-    for(const file of fileList){
-      if(file.size>budget){ skipped.push(file.name); continue; }
-      budget-=file.size;
-      const id="up-"+(upSeq++);
-      const xhr=new XMLHttpRequest();
-      uploads.set(id,{name:file.name,size:file.size,loaded:0,xhr});
-      renderFiles();
-      xhr.upload.addEventListener("progress",e=>{ const u=uploads.get(id); if(u){ u.loaded=e.loaded; updateUpRow(id); } });
-      xhr.addEventListener("load",()=>{
-        if(xhr.status===413){ try{ renderUsage(JSON.parse(xhr.responseText)); }catch{} noRoom([file.name]); }
-        else if(!(xhr.status>=200&&xhr.status<300)) addSys("upload failed: "+file.name);
-        uploads.delete(id); renderFiles(); // the shared file itself arrives via the /ws announce
-      });
-      xhr.addEventListener("error",()=>{ addSys("upload failed: "+file.name); uploads.delete(id); renderFiles(); });
-      xhr.addEventListener("abort",()=>{ uploads.delete(id); renderFiles(); });
-      const fd=new FormData(); fd.append("from",userName); fd.append("file",file,file.name);
-      xhr.open("POST","/files"); xhr.send(fd);
+    for(const [top,items] of folders){
+      const size=items.reduce((s,i)=>s+i.file.size,0);
+      if(size>budget){ skipped.push(top+"/"); continue; }
+      budget-=size; startUpload(items, top);
+    }
+    for(const e of loose){
+      if(e.file.size>budget){ skipped.push(e.file.name); continue; }
+      budget-=e.file.size; startUpload([e], null);
     }
     if(skipped.length) noRoom(skipped);
+  }
+  function uploadList(list){ upload([...list].map(f=>({file:f, path:f.webkitRelativePath||null}))); }
+
+  // Read a dropped folder (recursively) into [{file, path}]. readEntries hands out entries in
+  // batches, so it's called until it returns none.
+  function walkEntry(entry){
+    if(entry.isFile) return new Promise((res,rej)=>entry.file(f=>{
+      const p=entry.fullPath.replace(/^\//,"");
+      res([{file:f, path: p.includes("/") ? p : null}]);
+    },rej));
+    const reader=entry.createReader(), parts=[];
+    return new Promise((res,rej)=>{
+      const next=()=>reader.readEntries(batch=>{
+        if(!batch.length){ Promise.all(parts).then(r=>res(r.flat()),rej); return; }
+        for(const e of batch) parts.push(walkEntry(e));
+        next();
+      },rej);
+      next();
+    });
   }
 
   ["dragenter","dragover"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add("over");}));
   ["dragleave","drop"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove("over");}));
-  drop.addEventListener("drop",ev=>{ if(ev.dataTransfer&&ev.dataTransfer.files.length) upload(ev.dataTransfer.files); });
-  fileInput.addEventListener("change",()=>{ if(fileInput.files.length){ upload(fileInput.files); fileInput.value=""; } });
+  drop.addEventListener("drop",ev=>{
+    const dt=ev.dataTransfer; if(!dt) return;
+    // Entries must be taken during the drop event; they're gone afterwards.
+    const roots=[...(dt.items||[])].filter(i=>i.kind==="file").map(i=>i.webkitGetAsEntry ? i.webkitGetAsEntry() : null).filter(Boolean);
+    if(!roots.some(e=>e.isDirectory)){ if(dt.files.length) uploadList(dt.files); return; }
+    dropErr("");
+    Promise.all(roots.map(walkEntry))
+      .then(lists=>{ const all=lists.flat(); if(all.length) upload(all); else dropErr("That folder is empty."); })
+      .catch(()=>dropErr("Couldn't read that folder."));
+  });
+  fileInput.addEventListener("change",()=>{ if(fileInput.files.length){ uploadList(fileInput.files); fileInput.value=""; } });
+  $("pickFolder").addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); $("folderInput").click(); });
+  $("folderInput").addEventListener("change",()=>{
+    const fi=$("folderInput");
+    if(fi.files.length) uploadList(fi.files); else dropErr("That folder is empty.");
+    fi.value="";
+  });
   $("attach").addEventListener("click",()=>fileInput.click());
 
   // ---- admin (host only) ----
@@ -1056,8 +1257,9 @@
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); break;
         case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
         case "file": addFile(m.file,true); loadUsage(); break;
-        case "chatCleared": log.innerHTML=""; addSys("chat cleared by "+esc(m.byName)); break;
+        case "chatCleared": log.innerHTML=""; folderMsgs.clear(); addSys("chat cleared by "+esc(m.byName)); break;
         case "fileRemoved": files.delete(m.id); renderFiles(); loadUsage(); break;
+        case "filesRemoved": m.ids.forEach(id=>files.delete(id)); renderFiles(); loadUsage(); break;
         case "filesCleared": files.clear(); renderFiles(); loadUsage(); addSys("files cleared by "+esc(m.byName)); break;
       }
     };

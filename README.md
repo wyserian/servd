@@ -40,9 +40,11 @@ tab. The tabs that configure the host appear only on the host itself.
 ## Features
 
 - **HTTPS dashboard** on port `8443`, bound to your LAN or hotspot IP, with light and dark themes.
-- **Drop files:** drag and drop a file and it appears on every device. Download files one at a
-  time or all as one zip, delete one, or clear them all. The hub never fills its disk, and the host
-  can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
+- **Drop files:** drag and drop files or whole folders and they appear on every device. A folder
+  shows as one row (open it to see its files) and downloads as a zip with its structure kept.
+  Uploads queue up (3 at a time) with progress, speed, time left and cancel. Download files one at
+  a time or all as one zip, delete them, or clear them all. The hub never fills its disk, and the
+  host can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
   Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone.
 - **Browse files** (optional): the host shares a real folder, read-only or with uploads. Clients
@@ -116,7 +118,7 @@ grant all-files access. The folder picker then starts at Internal storage.
 
 | Tab | Who sees it | What it does |
 |---|---|---|
-| **drop files** | everyone | shared files pushed to every device |
+| **drop files** | everyone | shared files and folders pushed to every device |
 | **chat** | everyone | real-time chat |
 | **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
 | **serve site** | host only | re-serve a running web app to the LAN |
@@ -250,7 +252,7 @@ servd/
   | Join PIN | `GET /auth` state · `POST /auth` check PIN, set session cookie |
   | Host status | `GET /status`: host info + fingerprint |
   | Chat | WebSocket `/ws`: announce a name, then chat |
-  | Drop files | `POST /files` upload (413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` · `GET /files/usage` · delete/clear |
+  | Drop files | `POST /files` upload (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
   | Live site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
   | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/storage`, `/admin/browse*` and `/admin/proxy` |

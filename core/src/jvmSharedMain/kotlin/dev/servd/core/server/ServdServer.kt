@@ -259,18 +259,23 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 // File parts are streamed straight to disk below, so lift the cap well up (5 GB).
                 val multipart = call.receiveMultipart(formFieldLimit = 5L * 1024 * 1024 * 1024)
                 var from = "someone"
+                var path: String? = null  // set for files of a dropped folder (fields precede the file)
+                var batch: String? = null
                 val saved = mutableListOf<FileMeta>()
                 try {
                     multipart.forEachPart { part ->
                         try {
                             when (part) {
-                                is PartData.FormItem ->
-                                    if (part.name == "from") from = part.value.take(40).ifBlank { "someone" }
+                                is PartData.FormItem -> when (part.name) {
+                                    "from" -> from = part.value.take(40).ifBlank { "someone" }
+                                    "path" -> path = part.value.take(2000)
+                                    "batch" -> batch = part.value.take(64)
+                                }
                                 is PartData.FileItem -> {
                                     val name = part.originalFileName ?: "file"
                                     val contentType = part.contentType?.toString()
                                     val meta = part.provider().toInputStream().use {
-                                        fileStore.save(name, contentType, from, it)
+                                        fileStore.save(name, contentType, from, it, path, batch)
                                     }
                                     chatHub.announceFile(meta)
                                     saved += meta
@@ -295,15 +300,18 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             get("/files/usage") {
                 call.respondText(json.encodeToString(fileStore.usage()), ContentType.Application.Json)
             }
-            // Every shared file in one zip, streamed (nothing buffered in memory). Duplicate names
-            // get a " (2)" suffix so no entry overwrites another when extracted.
+            // Every shared file in one zip, or with ?batch= one dropped folder, streamed (nothing
+            // buffered in memory). Folder files keep their folder paths; duplicate names get a
+            // " (2)" suffix so no entry overwrites another when extracted.
             get("/files/zip") {
-                val entries = fileStore.entries()
+                val batch = call.request.queryParameters["batch"]
+                val entries = if (batch != null) fileStore.batchEntries(batch) else fileStore.entries()
                 if (entries.isEmpty()) return@get call.respond(HttpStatusCode.NotFound)
+                val zipName = if (batch != null) entries.first().first.path!!.substringBefore('/') + ".zip" else "servd-files.zip"
                 call.response.header(
                     HttpHeaders.ContentDisposition,
                     ContentDisposition.Attachment
-                        .withParameter(ContentDisposition.Parameters.FileName, "servd-files.zip")
+                        .withParameter(ContentDisposition.Parameters.FileName, zipName)
                         .toString(),
                 )
                 call.respondOutputStream(ContentType.Application.Zip) {
@@ -311,7 +319,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         zip.setLevel(Deflater.BEST_SPEED)
                         val used = HashSet<String>()
                         for ((meta, file) in entries) {
-                            zip.putNextEntry(ZipEntry(uniqueName(meta.name, used)))
+                            zip.putNextEntry(ZipEntry(uniqueName(meta.path ?: meta.name, used)))
                             file.inputStream().use { it.copyTo(zip) }
                             zip.closeEntry()
                         }
@@ -341,6 +349,13 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                     chatHub.announceFileRemoved(removed.id)
                     call.respond(HttpStatusCode.OK)
                 }
+            }
+            // Delete one dropped folder (all its files) in one go.
+            delete("/files/batch/{batch}") {
+                val removed = call.parameters["batch"]?.let { fileStore.removeBatch(it) }.orEmpty()
+                if (removed.isEmpty()) return@delete call.respond(HttpStatusCode.NotFound)
+                chatHub.announceFilesRemoved(removed.map { it.id })
+                call.respond(HttpStatusCode.OK)
             }
             delete("/files") {
                 val from = call.request.queryParameters["from"]?.take(40)?.ifBlank { "someone" } ?: "someone"
@@ -529,7 +544,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
     /** Delete files past the auto-clear age and tell every dashboard. */
     private suspend fun expireFiles() {
-        fileStore.expire().forEach { chatHub.announceFileRemoved(it.id) }
+        chatHub.announceFilesRemoved(fileStore.expire().map { it.id })
     }
 
     private fun pinConfig(): String =
@@ -539,12 +554,15 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 /** Reachable without a session while a join PIN is set: the page (it shows the PIN screen) and the check. */
 private val PIN_OPEN_PATHS = setOf("/", "/auth")
 
-/** [name], or "name (2).ext", "name (3).ext"… if already in [used]. Records the result in [used]. */
+/**
+ * [name], or "name (2).ext", "name (3).ext"… if already in [used]. Records the result in [used].
+ * [name] may be a path ("photos/a.jpg"); only the last segment's extension counts.
+ */
 private fun uniqueName(name: String, used: MutableSet<String>): String {
     var candidate = name
     var n = 2
     while (!used.add(candidate.lowercase())) {
-        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+        val dot = name.lastIndexOf('.').takeIf { it > name.lastIndexOf('/') + 1 } ?: name.length
         candidate = name.substring(0, dot) + " ($n)" + name.substring(dot)
         n++
     }

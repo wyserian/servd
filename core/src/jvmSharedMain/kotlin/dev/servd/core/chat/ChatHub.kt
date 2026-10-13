@@ -94,6 +94,10 @@ class ChatHub(private val serverName: String) {
         broadcast(FileRemoved(id))
     }
 
+    suspend fun announceFilesRemoved(ids: List<String>) {
+        if (ids.isNotEmpty()) broadcast(FilesRemoved(ids))
+    }
+
     suspend fun announceFilesCleared(byName: String) {
         broadcast(FilesCleared(byName))
     }

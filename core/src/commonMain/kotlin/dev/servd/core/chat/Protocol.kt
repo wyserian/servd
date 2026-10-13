@@ -67,6 +67,13 @@ data class FileMeta(
     val contentType: String? = null,
     val fromName: String,
     val ts: Long,
+    /**
+     * For a file dropped as part of a folder: its path inside that folder, starting with the
+     * folder's name (e.g. "photos/2024/a.jpg"). Null for a loose file.
+     */
+    val path: String? = null,
+    /** Groups the files of one folder drop (shown as one folder row); null for a loose file. */
+    val batch: String? = null,
 )
 
 /** Broadcast when someone uploads a file, so every dashboard updates live. */
@@ -83,6 +90,11 @@ data class ChatCleared(val byName: String) : ServerMessage
 @Serializable
 @SerialName("fileRemoved")
 data class FileRemoved(val id: String) : ServerMessage
+
+/** Broadcast when several shared files go at once (a folder deleted, or auto-clear). */
+@Serializable
+@SerialName("filesRemoved")
+data class FilesRemoved(val ids: List<String>) : ServerMessage
 
 /** Broadcast when all shared files are deleted. */
 @Serializable
