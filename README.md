@@ -15,8 +15,8 @@ devices. A phone is a full hub, running the same stack as desktop (Windows, Linu
 dashboard is the UI everywhere; Android adds only a thin native control screen.
 
 The host serves one HTTPS dashboard. It offers chat, file sharing, a shared host folder, and a
-reverse proxy for a running web app, plus optional SSH/SFTP and FTPS servers. Each feature is a
-tab. The tabs that configure the host appear only on the host itself.
+reverse proxy for a running web app, plus optional SSH/SFTP and FTPS servers. Controls that
+configure the host appear only on the host itself.
 
 - **Trusted-LAN tool:** there are no accounts, and admin controls work only on the host device.
   On shared Wi-Fi the host can turn on an optional join PIN. SSH/FTP use real credentials. See
@@ -39,38 +39,30 @@ tab. The tabs that configure the host appear only on the host itself.
 
 ## Features
 
-- **HTTPS dashboard** on port `8443`, bound to your LAN or hotspot IP, with light and dark themes.
-- **Drop files:** drag and drop files or whole folders and they appear on every device. A folder
-  shows as one row (open it to see its files) and downloads as a zip with its structure kept.
-  Uploads queue up (3 at a time) with progress, speed, time left and cancel. Download files one at
-  a time or all as one zip, delete them, or clear them all. The hub never fills its disk, and the
-  host can add a storage quota and auto-clear after 1 hour, 24 hours or 7 days.
-- **Chat:** real-time chat over WSS, with a live roster of who's connected (joins and leaves).
-  Enter sends; Ctrl+Enter adds a new line. Clearing the chat clears it for everyone. Shared files
-  preview inline: images (tap one for a full-size viewer), video and audio players, and the first
-  lines of text and code files. Images over 10 MB wait for a tap. Image files also get thumbnails
-  in drop files.
-- **Activity alerts:** a message or file from someone else while you're away puts a count in the
-  tab title and a dot on its icon. The chat tab shows unread messages. The bell in the top bar turns
-  on browser notifications (per device; some browsers don't allow them on a self-signed page).
+- **Drop files:** share files or whole folders with every device. Folders keep their structure, and
+  a folder or everything shared downloads as one zip. Uploads show progress, speed and time left,
+  and can be cancelled.
+- **Storage limits:** the hub never fills its own disk. The host can add a quota and auto-clear
+  shared files after 1 hour, 24 hours or 7 days.
+- **Chat:** real-time chat over WSS, with a live list of who's connected.
+- **Previews:** shared files preview inline in chat: images (with a full-size viewer), video and
+  audio players, and the first lines of text and code files. Image files also get thumbnails in the
+  file list.
+- **Activity alerts:** messages and files that arrive while you're away show as a count in the tab
+  title and the chat tab. Browser notifications are optional, but some browsers don't allow them on
+  a self-signed page.
 - **Browse files** (optional): the host shares a real folder, read-only or with uploads. Clients
-  can open subfolders, download single files, or download the current folder as a zip. The share
-  is locked to the chosen folder.
+  can open subfolders and download single files or whole folders as a zip. The share is locked to
+  the chosen folder.
 - **Serve site** (optional): a reverse proxy that re-serves a running web app (Node/Vite dev
   server, static host, any HTTP/HTTPS service) to the LAN over servd's HTTPS, on its own port.
   WebSockets and HMR/live reload work.
 - **SSH/SFTP and FTPS** (optional): FTPS uses explicit TLS. Both use a generated password and are
-  limited to the shared files. There's no OS shell. Each tab shows a copyable connect command.
+  limited to the shared files, with no OS shell.
 - **Easy joining:** a scan-to-join QR code, a friendly **`https://servd.local:8443`** address over
   mDNS, and mDNS discovery (`_servd._tcp`, or run `servd discover`).
-- **Join PIN** (optional): the host sets a 4-8 digit PIN, and other devices must enter it before
-  they can use the hub, including the serve-site port. It's saved across restarts until turned
-  off. Changing it signs everyone out.
-- **Host-only tabs:** browse setup, serve site, ssh and ftp, plus a host card with the fingerprint.
-  These are served only on loopback, each with a dot showing whether it's live.
-- **Desktop CLI:** starts the hub, prints the fingerprint, and opens the dashboard.
-- **Android host:** a foreground service keeps the hub alive in the background, and a native screen
-  controls it.
+- **Join PIN** (optional): other devices must enter a 4-8 digit PIN before they can use the hub,
+  including the serve-site port.
 
 ## Getting Started
 
@@ -95,20 +87,21 @@ servd v1.6.0 - local-network server tool
 
 admin   : https://127.0.0.1:8443   (this machine only)
 serving : https://10.205.210.12:8443   (share with other devices)
+by name : https://servd.local:8443   (iPhone, Mac, Windows, Linux - Android may need the IP)
 cert    : self-signed, SHA-256 fingerprint:
           12:3A:07:38:...:F5:CF
 keystore: C:\Users\you\.servd\keystore.jks
 ```
 
-The **admin** URL is the host's own view, where the host-only tabs appear. The **serving** URL is
-the one you share.
+The **admin** URL is the host's own view, where the host-only tabs and settings appear. The
+**serving** URL is the one you share.
 
 1. Put the other devices on the **same Wi-Fi**, or on the host's **hotspot**.
 2. On each device, open **`https://<serving-address>:8443`**, or scan the QR code in the dashboard.
    iPhone/iPad, Mac, Windows 10+ and most Linux can also use **`https://servd.local:8443`**. Many
    Android browsers can't resolve `.local` names, so use the IP or QR there.
    - If another device on the network already uses `servd.local`, this hub takes the next free name
-     (e.g. `servd-1.local`). The banner, the **This host** card and the Android control screen show
+     (e.g. `servd-1.local`). The banner, the **settings** drawer and the Android control screen show
      the name in use.
    - An existing certificate is kept, so its fingerprint doesn't change; only newly created
      certificates list the name.
@@ -137,8 +130,12 @@ grant all-files access. The folder picker then starts at Internal storage.
 | **serve site** | host only | re-serve a running web app to the LAN |
 | **ftp** / **ssh** | host only | turn the server on or off; shows the port, password and connect command |
 
-The left column has the device roster and QR code. On the host, it also has a **This host** card
-with the address, interface and fingerprint.
+The ⚙ **settings** button at the right of the top bar opens a side drawer:
+
+- **Every device** gets its own preferences: theme (system / light / dark) and browser
+  notifications.
+- **The host** also gets the join PIN, storage limits, and *about this host*: name, interface,
+  `.local` name and fingerprint.
 
 **Browse files:** on the host, pick a folder in the picker on the right; a whole drive works too.
 Tick **allow uploads** for read + write, then click **share this folder**. Use **stop sharing** to
@@ -153,6 +150,27 @@ turn it off; you can switch folders anytime. Paths that try to leave the folder 
 The app is served at the root, so SPA routes and absolute asset paths keep working. servd adds TLS,
 so even an HTTP-only or localhost-only app is reachable and encrypted across the LAN.
 
+### Join PIN & Storage Limits
+
+Both are set in the host's ⚙ **settings**, and on desktop also with the `--pin`, `--max-storage` and
+`--expire` flags. Both are saved until changed.
+
+**Join PIN:**
+- **Who needs it:** other devices see a PIN screen first. The host itself never needs it.
+- **Sessions:** after a correct PIN a device stays signed in for 30 days, until the PIN changes or
+  the hub restarts.
+- **Wrong guesses:** after 5 wrong tries a device is locked out for 30 s, and the wait doubles with
+  each further miss.
+
+**Storage limits:**
+- **Always on:** uploads that would leave the host's disk with less than 1 GB or 5% free
+  (whichever is larger) are refused.
+- **Optional:** a quota for shared files, and auto-clear after 1 hour, 24 hours or 7 days. Both are
+  off by default.
+- **How it shows:** everyone sees the space used and free under the drop zone. A file that doesn't
+  fit is refused before it uploads, or cut off mid-way with nothing left behind.
+- **Not counted:** SFTP/FTP uploads don't count toward the quota.
+
 ### Ports & Data Directory
 
 | Port | Service |
@@ -163,21 +181,9 @@ so even an HTTP-only or localhost-only app is reachable and encrypted across the
 | `8080` | serve site (only while serving; configurable) |
 
 All ports are non-privileged. SSH and FTP share one generated credential, username `servd`. Data
-(keystore, shared files, credential, join PIN, storage limits) lives in `~/.servd` on desktop, and
-in the app's private storage on Android. Drop files last until cleared: they don't survive a
+(keystore, SSH host key, credential, shared files, join PIN, storage limits) lives in `~/.servd` on desktop, and
+in the app's private storage on Android. Shared files last until cleared: they don't survive a
 restart, and the previous run's files are deleted on start.
-
-**Storage limits:** uploads that would leave the host's disk with less than 1 GB or 5% free (whichever
-is larger) are refused. That's always on. In the **This host** card (or with `--max-storage` /
-`--expire`), the host can also cap drop files with a quota and auto-clear them after 1 hour,
-24 hours or 7 days. Both are off by default and saved until changed. Everyone sees the space used and
-free under the drop zone. A file that doesn't fit is refused before it uploads, or cut off mid-way
-with nothing left behind. SFTP/FTP uploads don't count toward the quota.
-
-**Join PIN:** set it in the **This host** card (or with `--pin`). The host itself never needs it.
-Other devices see a PIN screen first, then stay signed in for 30 days, until the PIN changes or the
-hub restarts. After 5 wrong tries a device is locked out for 30 s, and the wait doubles with each
-further miss.
 
 ### Command-Line Options
 
@@ -189,7 +195,7 @@ servd discover            # find hubs on the network without typing an IP
 | Flag | Meaning | Default |
 |---|---|---|
 | `--port N` | HTTPS port | `8443` |
-| `--host IP` | bind address | detected LAN IP, else `127.0.0.1` |
+| `--host IP` | listen on this address only (and advertise it) | all interfaces, advertising the detected LAN IP |
 | `--dir PATH` | data dir | `~/.servd` |
 | `--no-open` | don't open the browser | opens |
 | `--browse-dir PATH` | share a folder on start | off |
@@ -205,16 +211,15 @@ servd discover            # find hubs on the network without typing an IP
 
 servd is built for a **trusted LAN**, and these limits are deliberate:
 
-- **Client routes** (dashboard, chat, files, roster) are bound to the LAN interface. By default
-  they're open to the network, with no account: anyone who can reach the hub and accepts the
-  certificate can use them.
+- **Client routes** (dashboard, chat, files, roster) are open to the network by default, with no
+  account. Anyone who can reach the hub and accepts the certificate can use them.
 - **Join PIN** (optional) gates every client route except the page itself and the PIN check, and
   the serve-site port too. A correct PIN gives a random session cookie (`Secure`, `HttpOnly`,
   `SameSite=Lax`), kept in memory, so a restart or a PIN change signs everyone out. Wrong guesses
   are rate-limited per device. It's a 4-8 digit PIN against casual access on shared networks, not a
   strong password.
-- **Admin routes** (`/admin/*`: service toggles, host info, certificate, join PIN, folder and proxy
-  setup) answer only on **loopback**. Only the host device can change settings.
+- **Admin routes** (`/admin/*`: service toggles, join PIN, storage limits, folder and proxy setup)
+  answer only on **loopback**. Only the host device can change settings.
 - **Drop files** can't fill the host's disk: uploads stop at the free-space floor (1 GB or 5%),
   plus the host's optional quota. Limits are counted as bytes arrive, not from the size a client
   claims.
@@ -237,7 +242,8 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
 servd/
 ├─ core/            Kotlin Multiplatform engine shared by desktop + Android
 │   ├─ commonMain     protocol models, PeerRegistry, LAN-address selection, Service model
-│   ├─ jvmSharedMain  Ktor server, TLS, chat hub, file store, folder browser, proxy, QR, SSH, FTP
+│   ├─ jvmSharedMain  Ktor server, TLS, chat hub, file store, folder browser, proxy, QR, SSH, FTP,
+│   │                 join PIN, .local name
 │   ├─ desktopMain    mDNS service advert + `servd discover` (JmDNS)
 │   ├─ androidMain    Android glue
 │   └─ resources/webui  the dashboard (one HTML/CSS/JS file)
@@ -254,17 +260,18 @@ servd/
 - **One HTTP engine**: `ServdServer` holds all routing and TLS setup and takes the engine as a
   parameter. Both platforms pass **Netty**, because Ktor's CIO engine can't serve HTTPS. The
   keystore is **PKCS12**, because Android has no JKS provider.
-- **Key abstractions** (`commonMain`):
-  - `Service` is a startable/stoppable server with an id, port and state. Implementations:
-    `HttpService` (always on), `SshService` and `FtpService`.
-  - `ServiceManager` starts, stops and toggles services, one call at a time.
-  - `ChatHub` tracks who's connected and broadcasts chat, join/leave and roster events.
+- **Key abstractions:**
+  - `Service` (`commonMain`) is a startable/stoppable server with an id, port and state.
+    `ServiceManager` starts, stops and toggles services, one call at a time.
+  - Implementations (`jvmSharedMain`): `HttpService` (always on), `SshService` and `FtpService`.
+  - `ChatHub` (`jvmSharedMain`) tracks who's connected and broadcasts chat, join/leave and roster
+    events.
+  - `FileStore` + `DropLimits` (`jvmSharedMain`) store shared files and enforce the free-space
+    floor, the quota and auto-clear (swept every minute).
   - `JoinPin` (`jvmSharedMain`) holds the optional PIN, the sessions and the per-device lockout.
   - `LocalName` (`jvmSharedMain`) answers mDNS lookups for the hub's `.local` name with JmDNS on
     both platforms. On Android it holds a Wi-Fi multicast lock, and the service itself is still
     advertised via `NsdManager`.
-  - `FileStore` + `DropLimits` (`jvmSharedMain`) store drop files and enforce the free-space
-    floor, the quota and auto-clear (swept every minute).
 - **Request flow**:
 
   | Area | Routes |
@@ -275,12 +282,14 @@ servd/
   | Chat | WebSocket `/ws`: announce a name, then chat |
   | Drop files | `POST /files` upload (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
-  | Live site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
+  | Serve site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
   | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/storage`, `/admin/browse*` and `/admin/proxy` |
 
 - **Out of scope**: Bluetooth (Wi-Fi/hotspot only), a native Compose UI, end-to-end encryption,
   scanning the whole LAN (the roster is the hub's peers plus mDNS hub discovery), and an external
-  database. State is kept in memory.
+  database. Chat, the shared-file list and sessions live in memory. Only keys and settings are saved
+  to disk: the keystore, the SSH host key, the SSH/FTP credential, the join PIN and the storage
+  limits.
 
 ## Tech Stack
 
@@ -335,13 +344,17 @@ On Windows it also applies the temp-dir workaround (see Troubleshooting). Prefer
 ### Building & Testing
 
 ```bash
-.\run.ps1 :core:desktopTest            # unit tests: LAN-address selection, chat hub, protocol
+.\run.ps1 :core:desktopTest            # unit tests
 .\run.ps1 :desktopHost:installDist     # desktop distribution
 .\run.ps1 :androidApp:assembleDebug    # debug APK
 ```
 
-Unit tests cover the pure logic with `kotlin-test`. Networked features are checked with a two-client
-WSS harness and `curl` smoke checks. The Android build is checked on a Pixel emulator via `adb`.
+The unit tests (`kotlin-test`) cover:
+- **Networking:** LAN-address selection, the chat protocol, service start/stop, the serve-site
+  localhost fallback.
+- **Access:** the join PIN (sessions, lockout, persistence) and `.local` name validation.
+- **Files:** path jailing in browse files, the file store with its storage limits, folder paths,
+  and the media types used for previews.
 
 ### Android Builds
 
@@ -441,11 +454,12 @@ its own OS runner. Finally it publishes a GitHub release with auto-generated not
 
 ### Troubleshooting
 
-- **`Unable to establish loopback connection`**: JDK 21's NIO creates a socket file in the temp
-  dir, and some Windows temp folders reject it (e.g. under some AV/EDR setups). `run.ps1` /
-  `run.bat` already point `TMP`/`TEMP` at `.sock-tmp/`. If you call `gradlew` directly, set them
-  yourself first:
-  `set TMP=%CD%\.sock-tmp && set TEMP=%CD%\.sock-tmp && gradlew :desktopHost:run`
+- **`Unable to establish loopback connection`** (Windows): JDK 21's NIO creates a socket file in
+  the temp dir, and some Windows temp folders reject it (e.g. under some AV/EDR setups).
+  - **servd itself** avoids this by using `~/.servd/sock` instead.
+  - **Gradle** can still hit it during a build. `run.ps1` / `run.bat` point `TMP`/`TEMP` at
+    `.sock-tmp/`. If you call `gradlew` directly, set them yourself first:
+    `set TMP=%CD%\.sock-tmp && set TEMP=%CD%\.sock-tmp && gradlew :desktopHost:run`
 - **"Not secure / certificate invalid"**: expected with a self-signed certificate. Check that the
   fingerprint matches the one from the CLI or the Android screen, then proceed.
 - **No LAN address found**: join Wi-Fi or start a hotspot, then restart. Otherwise servd binds to

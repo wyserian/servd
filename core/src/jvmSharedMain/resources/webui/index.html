@@ -81,10 +81,6 @@
   .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); border: 0; color: var(--muted); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
   .icon-btn:hover { color: var(--ink); background: var(--border); }
   .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  #bell.on { color: var(--accent-ink); background: var(--accent-soft); }
-  #bell.on .bell-slash { display: none; }
-  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60; width: max-content; max-width: min(92vw, 440px); background: var(--ink); color: var(--bg); font-size: 13px; line-height: 1.45; padding: 10px 14px; border-radius: var(--r); box-shadow: var(--shadow); }
-  .toast[hidden] { display: none; }
   /* uniform header control height */
   .status-pill, .host-chip, .namebox input { height: 32px; }
 
@@ -100,7 +96,6 @@
 
   /* ---------- devices ---------- */
   .col-left { display: flex; flex-direction: column; gap: 7px; min-height: 0; }
-  .col-left .host-card { flex: 0 0 auto; }
   .col-left .devices { flex: 1 1 auto; min-height: 0; }
   .devices { display: flex; flex-direction: column; }
   #roster { flex: 1; overflow-y: auto; min-height: 0; }
@@ -275,21 +270,48 @@
   #pxStatus a { color: var(--accent); word-break: break-all; }
   .br-pick-actions, .br-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-  /* ---------- host card (left column) ---------- */
-  .host-card-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-  /* join PIN: the host's setting (host card) and the guests' PIN screen */
+  /* ---------- settings drawer (host only): join PIN, storage, about this host ---------- */
+  .icon-btn[hidden] { display: none; }
+  #gear[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-soft); }
+  .drawer-backdrop { position: fixed; inset: 0; z-index: 64; background: rgba(5,10,12,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+  /* closed = off-screen and visibility:hidden, so nothing inside can take focus */
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 65; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--surface); box-shadow: var(--shadow); transform: translateX(100%); visibility: hidden; transition: transform .22s ease, visibility 0s linear .22s; }
+  .drawer.open { transform: none; visibility: visible; transition: transform .22s ease; }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+  .drawer-head h2 { margin: 0; font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  .drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .drawer-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2); color: var(--muted); text-decoration: none; font-family: var(--mono); font-size: 12.5px; }
+  .drawer-foot:hover { color: var(--ink); }
+  .drawer-foot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .drawer-ver { margin-left: auto; color: var(--faint); }
+  .host-settings { display: flex; flex-direction: column; gap: 10px; }
+  .host-settings[hidden] { display: none; }
+  .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .pref-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pref-title { font-size: 13px; color: var(--ink); }
+  .pin-note.warn { color: var(--warn); }
+  .seg { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 3px; background: var(--surface); border-radius: 8px; }
+  .seg button { border: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+  .set-sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--r); }
+  .set-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .set-head h3 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+  .set-sec .pin-field, .set-sec .sto-input { background: var(--surface); }
+  /* join PIN: the host's setting and the guests' PIN screen */
   .pin-state { font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .pin-state.on { color: var(--accent-ink); font-weight: 700; }
   .pin-set { display: flex; gap: 6px; flex-wrap: wrap; }
   .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
   .pin-field:focus, .pin-input:focus { outline: none; border-color: var(--accent); }
   .pin-note, .lock-hint { font-size: 11.5px; color: var(--faint); line-height: 1.45; }
-  .sto-grid { display: flex; gap: 6px; flex-wrap: wrap; }
-  .sto-field { flex: 1; min-width: 110px; display: flex; flex-direction: column; gap: 3px; }
+  .sto-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .sto-field { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 3px; }
   .sto-label { font-size: 11px; color: var(--muted); }
   .sto-input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; width: 100%; }
   .sto-input:focus { outline: none; border-color: var(--accent); }
-  .sto-save { align-self: flex-start; }
+  .sto-save { min-height: 32px; }
   .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
   .lock-screen[hidden] { display: none; }
   .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
@@ -325,7 +347,10 @@
     /* stack to one column; the page scrolls instead of each panel being fixed height */
     body { height: auto; overflow: auto; }
     .app { height: auto; min-height: 100dvh; }
-    .grid, .grid.no-rail { grid-template-columns: 1fr; }
+    /* minmax(0, ...) so a wide child (the device strip, the tab row) can't widen the column past
+       the screen - it scrolls inside its own panel instead */
+    .grid, .grid.no-rail { grid-template-columns: minmax(0, 1fr); }
+    .grid > * { min-width: 0; }
     .center { min-height: 60vh; }
   }
   @media (max-width: 700px) {
@@ -369,11 +394,87 @@
 </style>
 </head>
 <body>
-  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Image preview" hidden>
     <img id="viewerImg" alt="" />
     <div class="viewer-bar"><span id="viewerName"></span><a class="mini-btn" id="viewerDl" download>download</a><button class="mini-btn" id="viewerClose" type="button">close</button></div>
   </div>
+  <!-- host only: settings drawer (gear in the top bar) -->
+  <div class="drawer-backdrop" id="setBackdrop"></div>
+  <aside class="drawer" id="settingsDrawer" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="drawer-head">
+      <h2 id="setTitle">Settings</h2>
+      <button class="icon-btn" id="setClose" type="button" aria-label="Close settings" title="Close (Esc)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <!-- everyone: this device's preferences -->
+      <section class="set-sec" aria-labelledby="setPrefH">
+        <div class="set-head"><h3 id="setPrefH">Preferences</h3><span class="pin-state">this device</span></div>
+        <div class="pref-row">
+          <div class="pref-info"><div class="pref-title">Theme</div></div>
+          <div class="seg" role="radiogroup" aria-label="Theme">
+            <button type="button" role="radio" data-theme-opt="system" aria-checked="true">system</button>
+            <button type="button" role="radio" data-theme-opt="light" aria-checked="false">light</button>
+            <button type="button" role="radio" data-theme-opt="dark" aria-checked="false">dark</button>
+          </div>
+        </div>
+        <div class="pref-row">
+          <div class="pref-info"><div class="pref-title">Notifications</div><div class="pin-note" id="notifyNote">Alerts for new messages and files while this page is in the background.</div></div>
+          <label class="switch"><input type="checkbox" id="notifySwitch" aria-label="Notifications for new messages and files"><span class="track"></span><span class="knob"></span></label>
+        </div>
+      </section>
+
+      <!-- host only -->
+      <div class="host-settings" id="hostSettings" hidden>
+      <section class="set-sec" aria-labelledby="setPinH">
+        <div class="set-head"><h3 id="setPinH">Join PIN</h3><span class="pin-state" id="pinState">off</span></div>
+        <div class="pin-set">
+          <input class="pin-field" id="admPin" type="text" inputmode="numeric" maxlength="8" placeholder="4-8 digits" spellcheck="false" autocomplete="off" aria-label="Join PIN" />
+          <button class="mini-btn btn-primary" id="admPinSave" type="button" disabled>set PIN</button>
+          <button class="mini-btn btn-danger" id="admPinOff" type="button" hidden>turn off</button>
+        </div>
+        <div class="form-err" id="admPinErr" role="alert" hidden></div>
+        <div class="pin-note" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</div>
+      </section>
+
+      <section class="set-sec" aria-labelledby="setStoH">
+        <div class="set-head"><h3 id="setStoH">Storage</h3><span class="pin-state" id="stoState">no limits</span></div>
+        <div class="sto-grid">
+          <label class="sto-field"><span class="sto-label">Drop files quota (GB)</span><input class="sto-input" id="stoQuota" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="no limit" /></label>
+          <label class="sto-field"><span class="sto-label">Auto-clear</span>
+            <select class="sto-input" id="stoExpire"><option value="">off</option><option value="1">after 1 hour</option><option value="24">after 24 hours</option><option value="168">after 7 days</option></select>
+          </label>
+          <button class="mini-btn btn-primary sto-save" id="stoSave" type="button" disabled>save</button>
+        </div>
+        <div class="form-err" id="stoErr" role="alert" hidden></div>
+        <div class="pin-note">The hub always keeps 1 GB (or 5% of the disk) free, quota or not.</div>
+      </section>
+
+      <section class="set-sec" aria-labelledby="setAboutH">
+        <div class="set-head"><h3 id="setAboutH">About this host</h3></div>
+        <div class="kv"><span class="k">Host name</span><span class="v" id="admHost">-</span></div>
+        <div class="kv"><span class="k">Bound interface</span><span class="v" id="admIface">-</span></div>
+        <div class="kv" id="admNameRow" hidden>
+          <div class="k-row"><span class="k">By name</span><span class="pin-state">iPhone, Mac, Windows, Linux</span></div>
+          <span class="v" id="admName">-</span>
+        </div>
+        <div class="kv">
+          <div class="k-row"><span class="k">TLS fingerprint (SHA-256)</span><span class="chip-warn" title="Self-signed certificate - verify this fingerprint">self-signed</span></div>
+          <div class="fingerprint"><span class="v" id="admFp">-</span>
+            <button class="copy" id="copyfp" aria-label="Copy fingerprint" title="Copy fingerprint">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+      </div>
+
+      <!-- everyone: always the last thing in the drawer -->
+      <a class="drawer-foot" href="https://github.com/wyserian/servd" target="_blank" rel="noopener noreferrer">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span>GitHub</span><span class="drawer-ver" id="setVer"></span>
+      </a>
+    </div>
+  </aside>
   <div class="lock-screen" id="lockScreen" hidden>
     <form class="lock-box" id="lockForm" autocomplete="off">
       <div class="brand"><span class="prompt">~/</span>servd</div>
@@ -392,15 +493,9 @@
       <span class="spacer"></span>
       <span class="namebox"><input id="name" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Your display name" /><span class="you-suffix" aria-hidden="true">you</span></span>
       <span class="host-chip" id="hostChip" role="button" tabindex="0" title="Click to copy the share URL"><span class="lock" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span id="hostUrl">-</span></span>
-      <button class="icon-btn" id="bell" aria-pressed="false" aria-label="Notifications for new messages and files" title="Notify me about new messages and files">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 21h4"/><path class="bell-slash" d="M4 4l16 16"/></svg>
+      <button class="icon-btn" id="gear" type="button" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsDrawer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
       </button>
-      <button class="icon-btn" id="theme" aria-label="Toggle light / dark theme" title="Toggle light / dark">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
-      </button>
-      <a class="icon-btn" href="https://github.com/wyserian/servd" target="_blank" rel="noopener noreferrer" aria-label="servd source on GitHub" title="Source on GitHub">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      </a>
     </header>
 
     <div class="grid no-rail" id="grid">
@@ -412,47 +507,6 @@
           <div class="dev-qr">
             <span class="k">Scan to join</span>
             <img class="qr" id="qr" alt="Scan to open the hub on another device" width="140" height="140" />
-          </div>
-        </section>
-        <section class="panel host-card" id="hostCard" aria-label="This host" hidden>
-          <div class="panel-head"><span class="panel-title">This host</span></div>
-          <div class="host-card-body">
-            <div class="kv"><span class="k">Host name</span><span class="v" id="admHost">-</span></div>
-            <div class="kv"><span class="k">Bound interface</span><span class="v" id="admIface">-</span></div>
-            <div class="kv" id="admNameRow" hidden>
-              <div class="k-row"><span class="k">By name</span><span class="pin-state">iPhone, Mac, Windows, Linux</span></div>
-              <span class="v" id="admName">-</span>
-            </div>
-            <div class="kv">
-              <div class="k-row"><span class="k">TLS fingerprint (SHA-256)</span><span class="chip-warn" title="Self-signed certificate - verify this fingerprint">self-signed</span></div>
-              <div class="fingerprint"><span class="v" id="admFp">-</span>
-                <button class="copy" id="copyfp" aria-label="Copy fingerprint" title="Copy fingerprint">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-                </button>
-              </div>
-            </div>
-            <div class="kv">
-              <div class="k-row"><span class="k">Join PIN</span><span class="pin-state" id="pinState">off</span></div>
-              <div class="pin-set">
-                <input class="pin-field" id="admPin" type="text" inputmode="numeric" maxlength="8" placeholder="4-8 digits" spellcheck="false" autocomplete="off" aria-label="Join PIN" />
-                <button class="mini-btn btn-primary" id="admPinSave" type="button" disabled>set PIN</button>
-                <button class="mini-btn btn-danger" id="admPinOff" type="button" hidden>turn off</button>
-              </div>
-              <div class="form-err" id="admPinErr" role="alert" hidden></div>
-              <div class="pin-note" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</div>
-            </div>
-            <div class="kv">
-              <div class="k-row"><span class="k">Drop files</span><span class="pin-state" id="stoState">no limits</span></div>
-              <div class="sto-grid">
-                <label class="sto-field"><span class="sto-label">Quota (GB)</span><input class="sto-input" id="stoQuota" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="no limit" /></label>
-                <label class="sto-field"><span class="sto-label">Auto-clear</span>
-                  <select class="sto-input" id="stoExpire"><option value="">off</option><option value="1">after 1 hour</option><option value="24">after 24 hours</option><option value="168">after 7 days</option></select>
-                </label>
-              </div>
-              <button class="mini-btn btn-primary sto-save" id="stoSave" type="button" disabled>save</button>
-              <div class="form-err" id="stoErr" role="alert" hidden></div>
-              <div class="pin-note">The hub always keeps 1 GB (or 5% of the disk) free, quota or not.</div>
-            </div>
           </div>
         </section>
       </div>
@@ -624,15 +678,19 @@
   const files = new Map();
   const uploads = new Map(); let upSeq = 0; // upload rows (a loose file, or a whole dropped folder): id -> state
 
-  // theme
-  (function(){ const t=localStorage.getItem("servd-theme"); if(t) document.documentElement.setAttribute("data-theme",t); })();
-  $("theme").addEventListener("click", () => {
-    const isDark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const cur = document.documentElement.getAttribute("data-theme") || (isDark ? "dark":"light");
-    const next = cur==="dark" ? "light":"dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("servd-theme", next);
-  });
+  // theme (settings drawer): "system" follows the OS, or a fixed "light" / "dark"; remembered per device
+  function themePref(){ try{ return localStorage.getItem("servd-theme") || "system"; }catch{ return "system"; } }
+  function applyTheme(pref){
+    if(pref==="light" || pref==="dark") document.documentElement.setAttribute("data-theme", pref);
+    else document.documentElement.removeAttribute("data-theme");
+    document.querySelectorAll("[data-theme-opt]").forEach(b=>b.setAttribute("aria-checked", b.dataset.themeOpt===pref));
+  }
+  applyTheme(themePref());
+  document.querySelectorAll("[data-theme-opt]").forEach(b=>b.addEventListener("click",()=>{
+    const pref=b.dataset.themeOpt;
+    try{ if(pref==="system") localStorage.removeItem("servd-theme"); else localStorage.setItem("servd-theme", pref); }catch{}
+    applyTheme(pref);
+  }));
 
   function setConn(on){
     dot.classList.toggle("live", on);
@@ -657,11 +715,11 @@
     fetch("/status").then(r=>r.json()).then(s => {
       $("hostUrl").textContent = location.protocol + "//" + s.address + ":" + s.port;
       hubAddr = s.address; renderConnect();
-      if(s.version) $("brandVer").textContent = "v"+s.version;
+      if(s.version){ $("brandVer").textContent = "v"+s.version; $("setVer").textContent = "v"+s.version; }
       syncNameWidth();
       $("uptime").textContent = fmtUptime(s.uptimeMs);
       lastConnected = s.connected;
-      if (!$("hostCard").hidden) {
+      if (hostMode) { // settings drawer: about this host
         $("admHost").textContent = s.hostName || s.address;
         $("admIface").textContent = (s.interfaceName ? s.interfaceName + " · " : "") + s.address;
         $("admFp").textContent = s.fingerprintSha256;
@@ -1099,13 +1157,14 @@
   function applyHostMode(host){
     hostMode = host;
     $("liveTab").hidden = !host; $("ftpTab").hidden = !host; $("sshTab").hidden = !host;
+    $("hostSettings").hidden = !host; // the settings drawer's host-only sections
     updateSharingTab();
     if(!host && ["live","ftp","ssh"].includes(activeView())) document.querySelector('.tab[data-view="files"]').click();
   }
   function checkAdmin(){
     fetch("/admin/services").then(r=>{ if(!r.ok) throw 0; return r.json(); })
-      .then(list=>{ $("hostCard").hidden=false; applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); loadAdmPin(); loadAdmStorage(); })
-      .catch(()=>{ $("hostCard").hidden=true; applyHostMode(false); });
+      .then(list=>{ applyHostMode(true); renderServices(list); loadStatus(); loadAdmBrowse(); loadPicker(""); loadAdmProxy(); loadAdmPin(); loadAdmStorage(); })
+      .catch(()=>applyHostMode(false));
   }
 
   // ---- browse: a host-served directory (list / download / traverse / upload) ----
@@ -1304,19 +1363,18 @@
   window.addEventListener("focus", seen);
   document.querySelector('.tab[data-view="chat"]').addEventListener("click",()=>{ chatUnread=0; renderChatBadge(); });
 
-  // Browser notifications: off until turned on with the bell (remembered per device).
+  // Browser notifications: off until turned on in settings (remembered per device).
   const canNotify = "Notification" in window;
   let notifyOn=false;
   try{ notifyOn = localStorage.getItem("servd-notify")==="on" && canNotify && Notification.permission==="granted"; }catch{}
   function setNotify(on){
     notifyOn=on;
     try{ localStorage.setItem("servd-notify", on?"on":"off"); }catch{}
-    const b=$("bell"); b.classList.toggle("on",on); b.setAttribute("aria-pressed",on);
-    b.title = on ? "Notifications on - click to turn off" : "Notify me about new messages and files";
+    $("notifySwitch").checked=on;
   }
   setNotify(notifyOn);
-  let toastTimer=null;
-  function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.hidden=true; },5000); }
+  const NOTIFY_HELP="Alerts for new messages and files while this page is in the background.";
+  function notifyMsg(msg){ const n=$("notifyNote"); n.textContent = msg || NOTIFY_HELP; n.classList.toggle("warn", !!msg); }
   function notify(who, text, view){
     if(!notifyOn || !canNotify || Notification.permission!=="granted") return;
     try{
@@ -1325,18 +1383,20 @@
       n.onclick=()=>{ window.focus(); selectView(view); n.close(); };
     }catch{}
   }
-  $("bell").addEventListener("click",()=>{
-    if(notifyOn){ setNotify(false); toast("Notifications off. The tab title still shows new activity."); return; }
-    if(!canNotify){ toast("This browser can't show notifications here. The tab title still shows new activity."); return; }
-    if(Notification.permission==="denied"){ toast("Notifications are blocked for this site. Allow them in the browser's site settings, then try again."); return; }
+  $("notifySwitch").addEventListener("change",()=>{
+    const sw=$("notifySwitch");
+    if(!sw.checked){ setNotify(false); notifyMsg(""); return; }
+    sw.checked=false; // stays off until the browser agrees
+    if(!canNotify){ notifyMsg("This browser can't show notifications here. The tab title still shows new activity."); return; }
+    if(Notification.permission==="denied"){ notifyMsg("Notifications are blocked for this site. Allow them in the browser's site settings, then try again."); return; }
     const ask = Notification.permission==="granted" ? Promise.resolve("granted") : Promise.resolve(Notification.requestPermission());
     ask.then(p=>{
-      if(p!=="granted"){ toast("Notifications weren't allowed. The tab title still shows new activity."); return; }
+      if(p!=="granted"){ notifyMsg("Notifications weren't allowed. The tab title still shows new activity."); return; }
       try{
         new Notification("servd", {body:"Notifications are on. You'll get one when a message or file arrives while this page is in the background.", tag:"servd-test", icon: baseIcon || undefined});
-        setNotify(true);
-      }catch{ toast("This browser can't show notifications on this page. The tab title still shows new activity."); }
-    }).catch(()=>toast("Couldn't turn on notifications in this browser."));
+        setNotify(true); notifyMsg("");
+      }catch{ notifyMsg("This browser can't show notifications on this page. The tab title still shows new activity."); }
+    }).catch(()=>notifyMsg("Couldn't turn on notifications in this browser."));
   });
   function updateClearBtn(){ const v=activeView(); $("clearBtn").style.display = (v==="files"||v==="chat") ? "" : "none"; $("clearBtn").textContent = v==="files" ? "clear files" : "clear chat"; $("dlAllBtn").style.display = v==="files" ? "" : "none"; }
   // Download all: the server streams one zip; the button acknowledges the click right away.
@@ -1467,7 +1527,7 @@
       .finally(()=>{ b.textContent="join"; b.disabled=$("pinInput").value.length<4; });
   });
 
-  // Host: set / change / turn off the PIN from the host card.
+  // Host: set / change / turn off the PIN from the settings drawer.
   let curPin=null;
   function renderPin(c){
     curPin = c.enabled ? c.pin : null;
@@ -1495,7 +1555,26 @@
   $("admPinSave").addEventListener("click",()=>savePin($("admPin").value, $("admPinSave"), "saving…"));
   $("admPinOff").addEventListener("click",()=>savePin("", $("admPinOff"), "turning off…"));
 
-  // Host: drop-files quota (GB, blank = none) and auto-clear, from the host card.
+  // Settings drawer: opened by the gear in the top bar; Esc, the backdrop or X closes it.
+  // Preferences (theme, notifications) are for every device; the host also gets PIN, storage, about.
+  function openSettings(){
+    $("settingsDrawer").classList.add("open"); $("setBackdrop").classList.add("open");
+    $("gear").setAttribute("aria-expanded","true");
+    if(hostMode){ loadAdmPin(); loadAdmStorage(); loadStatus(); } // fresh values each time it opens
+    setTimeout(()=>$("setClose").focus(), 50);
+  }
+  function closeSettings(){
+    if(!$("settingsDrawer").classList.contains("open")) return;
+    $("settingsDrawer").classList.remove("open"); $("setBackdrop").classList.remove("open");
+    $("gear").setAttribute("aria-expanded","false");
+    $("gear").focus();
+  }
+  $("gear").addEventListener("click",()=>{ if($("settingsDrawer").classList.contains("open")) closeSettings(); else openSettings(); });
+  $("setClose").addEventListener("click",closeSettings);
+  $("setBackdrop").addEventListener("click",closeSettings);
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("viewer").hidden) closeSettings(); });
+
+  // Host: drop-files quota (GB, blank = none) and auto-clear, in the settings drawer.
   const GB=1073741824;
   let stoCur={maxBytes:null,expireHours:null};
   function stoForm(){
@@ -1515,7 +1594,7 @@
     $("stoState").textContent = st.length ? st.join(" · ") : "no limits";
     $("stoState").classList.toggle("on", st.length>0);
     $("stoSave").textContent="save"; syncStoBtn();
-    renderUsage(u);
+    renderUsage(u); // the usage line shows the quota and auto-clear to everyone
   }
   function loadAdmStorage(){ fetch("/admin/storage").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderStorage).catch(()=>{}); }
   $("stoQuota").addEventListener("input",()=>{ $("stoErr").hidden=true; syncStoBtn(); });
