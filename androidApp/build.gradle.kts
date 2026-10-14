@@ -86,3 +86,8 @@ dependencies {
     // Rasterize the join QR for the control screen (core's Qr emits SVG).
     implementation(libs.zxing.core)
 }
+
+// Ktor's Netty engine (Netty 4.2) pulls in HTTP/3 QUIC native libraries for desktop OSes. servd
+// doesn't use HTTP/3, and on Android they're dead weight (their bundled licence files even clash
+// at packaging). The QUIC Java classes stay, so the engine still links.
+configurations.configureEach { exclude(group = "io.netty", module = "netty-codec-native-quic") }

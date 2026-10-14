@@ -291,7 +291,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                                 else -> {}
                             }
                         } finally {
-                            part.dispose()
+                            part.release()
                         }
                     }
                 } catch (e: FileStore.StorageFullException) {
@@ -434,7 +434,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         val saved = part.provider().toInputStream().use { browser.upload(dir, name, it) }
                         ok = saved || ok
                     }
-                    part.dispose()
+                    part.release()
                 }
                 call.respond(if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest)
             }

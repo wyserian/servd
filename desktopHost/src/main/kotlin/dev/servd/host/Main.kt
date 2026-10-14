@@ -252,7 +252,7 @@ private fun portInUse(port: Int, noOpen: Boolean): Nothing {
     println("Close that program, or start servd on another port: servd --port 9443")
     if (System.console() != null) {
         println("Press Enter to exit.")
-        readLine()
+        readlnOrNull()
     }
     exitProcess(1)
 }

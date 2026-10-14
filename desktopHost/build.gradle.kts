@@ -24,6 +24,11 @@ dependencies {
     runtimeOnly(libs.slf4j.simple)
 }
 
+// Ktor's Netty engine (Netty 4.2) pulls in HTTP/3 QUIC native libraries for every desktop OS.
+// servd doesn't use HTTP/3, so leave them out of the bundle; the QUIC Java classes stay, so the
+// engine still links.
+configurations.configureEach { exclude(group = "io.netty", module = "netty-codec-native-quic") }
+
 application {
     applicationName = "servd"
     mainClass.set("dev.servd.host.MainKt")

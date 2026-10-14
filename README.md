@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/wyserian/servd?sort=semver&label=release)](https://github.com/wyserian/servd/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-informational)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4.21-7F52FF?logo=kotlin&logoColor=white)
 
 ## About
 
@@ -76,7 +76,7 @@ Desktop builds bundle their own Java runtime, so nothing else is needed. To buil
 |---|---|---|
 | Windows | `servd-<version>-windows.zip` | unzip, run `servd\servd.exe` |
 | Linux | `servd-<version>-x86_64.AppImage` | `chmod +x`, run it |
-| Android | `servd-<version>-release.apk` | install it (allow unknown sources) |
+| Android 8.0+ | `servd-<version>-release.apk` | install it (allow unknown sources) |
 
 ### Connecting Devices
 
@@ -297,22 +297,22 @@ Exact versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.
 
 | Area | Component | Version | Role |
 |---|---|---|---|
-| Language | Kotlin Multiplatform | `2.1.0` | shared `core` for desktop JVM + Android |
-| Build | Gradle (Kotlin DSL) | `8.11.1` | wrapper committed |
-| Build | Android Gradle Plugin | `8.7.3` | Android build (`multiDexEnabled` for Netty) |
+| Language | Kotlin Multiplatform | `2.4.21` | shared `core` for desktop JVM + Android |
+| Build | Gradle (Kotlin DSL) | `8.14.6` | wrapper committed |
+| Build | Android Gradle Plugin | `8.13.2` | Android build (`multiDexEnabled` for Netty) |
 | Runtime | JDK | 17 target | Java 17 bytecode, built with JDK 21 |
-| Android | SDK | compile/target 35, min 24 | |
-| Server | Ktor + Netty | `3.0.3` | HTTPS + WebSocket; Netty is the engine on both platforms; partial-content for video seeking |
-| Proxy | Ktor client (CIO) | `3.0.3` | outbound HTTP + WebSocket forwarding |
+| Android | SDK | compile/target 35, min 26 (Android 8.0; Netty 4.2 needs it) | |
+| Server | Ktor + Netty | `3.6.0` / Netty 4.2 | HTTPS + WebSocket; Netty is the engine on both platforms; partial-content for video seeking |
+| Proxy | Ktor client (CIO) | `3.6.0` | outbound HTTP + WebSocket forwarding |
 | TLS | JSSE / PKCS12 | JDK | self-signed keystore, SHA-256 fingerprint |
 | Net | `java.net.NetworkInterface` | JDK | LAN/hotspot address detection |
-| SSH | Apache MINA SSHD | `2.13.2` | SSH/SFTP server |
-| FTP | Apache FtpServer | `1.2.0` | FTPS server |
-| Discovery | JmDNS / `NsdManager` (Android) | `3.5.9` | mDNS/DNS-SD; the `.local` name (JmDNS on both) |
-| QR | ZXing | `3.5.3` | scan-to-join QR |
-| Data | kotlinx.serialization | `1.7.3` | JSON WebSocket protocol |
-| Async | kotlinx.coroutines | `1.9.0` | async server + guarded broadcast |
-| Logging | SLF4J + slf4j-simple | `2.0.16` | desktop logging |
+| SSH | Apache MINA SSHD | `2.20.0` | SSH/SFTP server |
+| FTP | Apache FtpServer | `1.2.1` | FTPS server |
+| Discovery | JmDNS / `NsdManager` (Android) | `3.6.4` | mDNS/DNS-SD; the `.local` name (JmDNS on both) |
+| QR | ZXing | `3.5.4` | scan-to-join QR |
+| Data | kotlinx.serialization | `1.11.0` | JSON WebSocket protocol |
+| Async | kotlinx.coroutines | `1.11.0` | async server + guarded broadcast |
+| Logging | SLF4J + slf4j-simple | `2.0.20` | desktop logging |
 | Frontend | plain HTML/CSS/JS | | single-file dashboard, no framework |
 
 ## Development
