@@ -925,7 +925,7 @@
     const sz=row.querySelector('.upsize'); if(sz) sz.textContent=s.size;
   }
   function addFile(f, announce){
-    const isNew=!files.has(f.id); files.set(f.id,f); renderFiles();
+    const isNew=!files.has(f.id); files.set(f.id,f); scheduleRender();
     if(isNew&&announce){
       if(f.batch) addFolderMsg(f); // alerts once, when the folder's first file arrives
       else { addFileMsg(f); if(f.fromName!==userName) noteActivity(f.fromName, "shared "+f.name+" ("+fmtSize(f.size)+")", "files"); }
@@ -945,6 +945,11 @@
     el.classList.toggle("full", u.roomBytes<=0);
   }
   function loadUsage(){ fetch("/files/usage").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderUsage).catch(()=>{}); }
+  // A folder of hundreds of files arrives as hundreds of events: redraw the list at most once per
+  // 50 ms and refresh the usage line at most once a second, instead of once per file.
+  let renderTimer=0, usageTimer=0;
+  function scheduleRender(){ if(!renderTimer) renderTimer=setTimeout(()=>{ renderTimer=0; renderFiles(); },50); }
+  function scheduleUsage(){ if(!usageTimer) usageTimer=setTimeout(()=>{ usageTimer=0; loadUsage(); },1000); }
   function dropErr(msg){ const e=$("dropErr"); e.textContent=msg; e.hidden=!msg; }
   function noRoom(names){
     const free = usage ? fmtSize(usage.roomBytes)+" free" : "no space left";
@@ -1487,11 +1492,11 @@
         case "roster": renderRoster(m.peers); break;
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); if(m.fromId!==selfId) noteActivity(m.fromName, m.text.length>140 ? m.text.slice(0,140)+"…" : m.text, "chat"); break;
         case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
-        case "file": addFile(m.file,true); loadUsage(); break;
+        case "file": addFile(m.file,true); scheduleUsage(); break;
         case "chatCleared": log.innerHTML=""; folderMsgs.clear(); addSys("chat cleared by "+esc(m.byName)); break;
-        case "fileRemoved": files.delete(m.id); renderFiles(); loadUsage(); break;
-        case "filesRemoved": m.ids.forEach(id=>files.delete(id)); renderFiles(); loadUsage(); break;
-        case "filesCleared": files.clear(); renderFiles(); loadUsage(); addSys("files cleared by "+esc(m.byName)); break;
+        case "fileRemoved": files.delete(m.id); scheduleRender(); scheduleUsage(); break;
+        case "filesRemoved": m.ids.forEach(id=>files.delete(id)); scheduleRender(); scheduleUsage(); break;
+        case "filesCleared": files.clear(); scheduleRender(); scheduleUsage(); addSys("files cleared by "+esc(m.byName)); break;
       }
     };
   }

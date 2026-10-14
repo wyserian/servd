@@ -59,12 +59,16 @@ import io.ktor.server.websocket.webSocket
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.OutputStream
 
 /**
  * servd's single HTTPS server. Phase 1 serves the dashboard shell and a `/status` endpoint;
@@ -282,8 +286,12 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                                 is PartData.FileItem -> {
                                     val name = part.originalFileName ?: "file"
                                     val contentType = part.contentType?.toString()
-                                    val meta = part.provider().toInputStream().use {
-                                        fileStore.save(name, contentType, from, it, path, batch)
+                                    // Blocking stream + disk writes: off the request threads, or a few
+                                    // slow uploads would stall every other request until they finish.
+                                    val meta = withContext(Dispatchers.IO) {
+                                        part.provider().toInputStream().use {
+                                            fileStore.save(name, contentType, from, it, path, batch)
+                                        }
                                     }
                                     chatHub.announceFile(meta)
                                     saved += meta
@@ -323,15 +331,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         .toString(),
                 )
                 call.respondOutputStream(ContentType.Application.Zip) {
-                    ZipOutputStream(this).use { zip ->
-                        zip.setLevel(Deflater.BEST_SPEED)
-                        val used = HashSet<String>()
-                        for ((meta, file) in entries) {
-                            zip.putNextEntry(ZipEntry(uniqueName(meta.path ?: meta.name, used)))
-                            file.inputStream().use { it.copyTo(zip) }
-                            zip.closeEntry()
-                        }
-                    }
+                    writeZip(entries.asSequence().map { (meta, file) -> (meta.path ?: meta.name) to file })
                 }
             }
             get("/files/{id}") {
@@ -408,19 +408,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         .withParameter(ContentDisposition.Parameters.FileName, dir.name.ifBlank { "servd-share" } + ".zip")
                         .toString(),
                 )
-                call.respondOutputStream(ContentType.Application.Zip) {
-                    ZipOutputStream(this).use { zip ->
-                        zip.setLevel(Deflater.BEST_SPEED)
-                        for ((path, file) in files) {
-                            val input = runCatching { file.inputStream() }.getOrNull() ?: continue
-                            input.use {
-                                zip.putNextEntry(ZipEntry(path))
-                                it.copyTo(zip)
-                                zip.closeEntry()
-                            }
-                        }
-                    }
-                }
+                call.respondOutputStream(ContentType.Application.Zip) { writeZip(files) }
             }
             post("/fs/upload") {
                 if (!browser.enabled) return@post call.respond(HttpStatusCode.NotFound)
@@ -431,7 +419,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 multipart.forEachPart { part ->
                     if (part is PartData.FileItem) {
                         val name = part.originalFileName ?: "file"
-                        val saved = part.provider().toInputStream().use { browser.upload(dir, name, it) }
+                        val saved = withContext(Dispatchers.IO) { // blocking, see POST /files
+                            part.provider().toInputStream().use { browser.upload(dir, name, it) }
+                        }
                         ok = saved || ok
                     }
                     part.release()
@@ -565,6 +555,44 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
 /** Reachable without a session while a join PIN is set: the page (it shows the PIN screen) and the check. */
 private val PIN_OPEN_PATHS = setOf("/", "/auth")
+
+/**
+ * Stream [entries] (zip path to file) as one zip. Unreadable files are skipped rather than failing
+ * the whole download, and duplicate paths get a " (2)" suffix so nothing is overwritten on extract.
+ *
+ * Tuned for speed on a LAN, where CPU is the bottleneck, not bandwidth (it matters most on a phone
+ * hub). Formats that are already compressed (photos, video, audio, archives) are stored rather than
+ * deflated again: recompressing them burns CPU and makes them slightly bigger. Writes are buffered
+ * in large blocks rather than the deflater's tiny ones.
+ */
+private fun OutputStream.writeZip(entries: Sequence<Pair<String, File>>) {
+    ZipOutputStream(BufferedOutputStream(this, ZIP_BUFFER)).use { zip ->
+        val used = HashSet<String>()
+        for ((path, file) in entries) {
+            val input = runCatching { file.inputStream() }.getOrNull() ?: continue
+            input.use {
+                zip.setLevel(if (isCompressed(path)) Deflater.NO_COMPRESSION else Deflater.BEST_SPEED)
+                zip.putNextEntry(ZipEntry(uniqueName(path, used)))
+                it.copyTo(zip, ZIP_BUFFER)
+                zip.closeEntry()
+            }
+        }
+    }
+}
+
+private const val ZIP_BUFFER = 64 * 1024
+
+/** Formats that are already compressed, so deflating them again gains nothing. */
+private val COMPRESSED_EXT = setOf(
+    "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif",
+    "mp4", "m4v", "mov", "webm", "mkv", "avi", "3gp",
+    "mp3", "m4a", "aac", "ogg", "oga", "opus", "flac",
+    "zip", "7z", "rar", "gz", "tgz", "bz2", "xz", "zst", "apk", "jar",
+    "docx", "xlsx", "pptx", "odt", "ods", "odp", "epub", "pdf",
+)
+
+private fun isCompressed(path: String): Boolean =
+    path.substringAfterLast('/').substringAfterLast('.', "").lowercase() in COMPRESSED_EXT
 
 /**
  * [name], or "name (2).ext", "name (3).ext"… if already in [used]. Records the result in [used].
