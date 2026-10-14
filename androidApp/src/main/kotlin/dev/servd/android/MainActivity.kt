@@ -229,6 +229,7 @@ class MainActivity : Activity() {
         }
         heading("Admin", "(this device only)"); sb.append(info.adminUrl).append("/")
         heading("Share"); sb.append(info.url).append("/")
+        info.localUrl?.let { heading("By name", "(iPhone, Mac, Windows, Linux)"); sb.append(it).append("/") }
         if (!info.onLan) {
             heading("Network")
             sb.append("No Wi-Fi/hotspot detected - reachable on this device only until you connect one.")

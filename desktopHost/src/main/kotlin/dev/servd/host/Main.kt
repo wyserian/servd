@@ -2,6 +2,7 @@ package dev.servd.host
 
 import dev.servd.core.Servd
 import dev.servd.core.auth.JoinPin
+import dev.servd.core.discovery.LocalName
 import dev.servd.core.discovery.MdnsAdvertiser
 import dev.servd.core.discovery.MdnsBrowser
 import dev.servd.core.net.detectLanAddress
@@ -33,6 +34,7 @@ import kotlin.system.exitProcess
  *       [--proxy-target URL [--proxy-port N]]                       also re-serve a live web app
  *       [--pin DIGITS | --pin off]                                  set (and save) or clear the join PIN
  *       [--max-storage 10G|off] [--expire 1h|24h|7d|off]            drop-files quota / auto-clear (saved)
+ *       [--name NAME | --name off]                                  .local name over mDNS (default servd)
  *   servd discover                                                  find hubs on the network
  */
 fun main(args: Array<String>) {
@@ -65,7 +67,17 @@ fun main(args: Array<String>) {
         println("(no LAN address found - reachable at 127.0.0.1 only; connect Wi-Fi/hotspot for other devices)")
     }
 
-    val tls = ServdCertificates.loadOrCreate(dataDir, listOfNotNull(advertisedHost, lan?.ip))
+    // The .local name to answer over mDNS (servd.local by default; --name off = none).
+    val friendlyName: String? = when (val n = opts.name?.trim()?.lowercase()) {
+        null -> LocalName.DEFAULT
+        "off" -> null
+        else -> n.takeIf { LocalName.isValid(it) }
+            ?: usageError("--name takes letters, digits and \"-\" (e.g. --name myhub for myhub.local), or \"off\".")
+    }
+
+    // An existing keystore is reused as-is (so its fingerprint stays the one people verified);
+    // only a newly created certificate also lists the .local name.
+    val tls = ServdCertificates.loadOrCreate(dataDir, listOfNotNull(advertisedHost, lan?.ip, friendlyName?.let { "$it.local" }))
     val filesDir = File(dataDir, "files")
     // Optional services (off until enabled from the admin panel), sharing one credential.
     val servdPassword = ServdCredentials.loadOrCreatePassword(dataDir)
@@ -116,11 +128,32 @@ fun main(args: Array<String>) {
     // means admin is only available if that host is itself loopback.
     val localUrl = if (bindHost == "0.0.0.0") "https://127.0.0.1:${opts.port}/" else server.url
 
+    // Advertise over mDNS so other devices can find this hub without typing an IP: the
+    // _servd._tcp service (for `servd discover`) and the friendly .local name (e.g. servd.local).
+    val advertiser = MdnsAdvertiser()
+    val advertised = runCatching {
+        advertiser.start(
+            bindAddress = InetAddress.getByName(advertisedHost),
+            hostName = friendlyName,
+            instanceName = "servd@" + hostName(),
+            port = opts.port,
+            txt = mapOf(
+                "version" to Servd.VERSION,
+                "fingerprint" to tls.fingerprintSha256,
+                "https" to "true",
+                "path" to "/",
+            ),
+        )
+    }.isSuccess
+    // Only when it's on the LAN: a loopback-only hub has no one to answer.
+    server.localName = advertiser.hostName.takeIf { advertised && friendlyName != null && lan != null }
+
     println()
     if (bindHost == "0.0.0.0") {
         println("admin   : https://127.0.0.1:${opts.port}   (this machine only)")
     }
     println("serving : ${server.url}   (share with other devices)")
+    server.localName?.let { println("by name : https://$it:${opts.port}   (iPhone, Mac, Windows, Linux - Android may need the IP)") }
     if (opts.proxyTarget != null) {
         println("proxy   : https://$advertisedHost:${opts.proxyPort}   ->  ${opts.proxyTarget}   (live site)")
     }
@@ -136,21 +169,6 @@ fun main(args: Array<String>) {
         }
     }
     println()
-    // Advertise over mDNS so other devices can find this hub without typing an IP.
-    val advertiser = MdnsAdvertiser()
-    val advertised = runCatching {
-        advertiser.start(
-            bindAddress = InetAddress.getByName(advertisedHost),
-            instanceName = "servd@" + hostName(),
-            port = opts.port,
-            txt = mapOf(
-                "version" to Servd.VERSION,
-                "fingerprint" to tls.fingerprintSha256,
-                "https" to "true",
-                "path" to "/",
-            ),
-        )
-    }.isSuccess
     Runtime.getRuntime().addShutdownHook(Thread { println("\nshutting down..."); advertiser.stop(); server.stop() })
 
     println("Open that URL on any device on this network. The browser will warn about the")
@@ -298,6 +316,7 @@ private data class Opts(
     val pin: String? = null,
     val maxStorage: String? = null,
     val expire: String? = null,
+    val name: String? = null,
 ) {
     companion object {
         fun parse(args: Array<String>): Opts {
@@ -312,6 +331,7 @@ private data class Opts(
             var pin: String? = null
             var maxStorage: String? = null
             var expire: String? = null
+            var name: String? = null
             var i = 0
             while (i < args.size) {
                 when (args[i]) {
@@ -327,10 +347,11 @@ private data class Opts(
                     "--pin" -> pin = args.getOrNull(++i)
                     "--max-storage" -> maxStorage = args.getOrNull(++i)
                     "--expire" -> expire = args.getOrNull(++i)
+                    "--name" -> name = args.getOrNull(++i)
                 }
                 i++
             }
-            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort, pin, maxStorage, expire)
+            return Opts(port, host, dir, noOpen, browseDir, browseWrite, proxyTarget, proxyPort, pin, maxStorage, expire, name)
         }
     }
 }

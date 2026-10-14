@@ -110,6 +110,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     /** Optional join PIN (off by default); the host can also set it before [start]. */
     val joinPin = JoinPin(pinFile)
 
+    /** The .local name this hub answers to over mDNS (e.g. "servd.local"), set by the platform once claimed. */
+    @Volatile var localName: String? = null
+
     private val startedAt = System.currentTimeMillis()
     private val chatHub = ChatHub(serverName = advertisedHost)
     private val fileStore = FileStore(filesDir, DropLimits(limitsFile))
@@ -236,6 +239,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                     append("\"port\":").append(port).append(',')
                     append("\"hostName\":\"").append(hostName).append("\",")
                     append("\"interfaceName\":").append(ifaceJson).append(',')
+                    append("\"localName\":").append(localName?.let { "\"$it\"" } ?: "null").append(',')
                     append("\"uptimeMs\":").append(System.currentTimeMillis() - startedAt).append(',')
                     append("\"connected\":").append(chatHub.connectionCount()).append(',')
                     append("\"tls\":\"self-signed\",")

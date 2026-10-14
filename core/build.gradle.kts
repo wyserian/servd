@@ -54,6 +54,9 @@ kotlin {
                 implementation(libs.sshd.core)
                 implementation(libs.sshd.sftp)
                 implementation(libs.ftpserver.core)
+                // mDNS: answers for the hub's .local name on both platforms; desktop also
+                // advertises/discovers the _servd._tcp service with it (Android uses NsdManager).
+                implementation(libs.jmdns)
             }
         }
         val androidMain by getting {
@@ -61,10 +64,6 @@ kotlin {
         }
         val desktopMain by getting {
             dependsOn(jvmSharedMain)
-            dependencies {
-                // mDNS advertisement/discovery on desktop (Android uses NsdManager instead).
-                implementation(libs.jmdns)
-            }
         }
     }
 }

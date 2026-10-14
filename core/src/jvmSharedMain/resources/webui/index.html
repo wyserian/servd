@@ -419,6 +419,10 @@
           <div class="host-card-body">
             <div class="kv"><span class="k">Host name</span><span class="v" id="admHost">-</span></div>
             <div class="kv"><span class="k">Bound interface</span><span class="v" id="admIface">-</span></div>
+            <div class="kv" id="admNameRow" hidden>
+              <div class="k-row"><span class="k">By name</span><span class="pin-state">iPhone, Mac, Windows, Linux</span></div>
+              <span class="v" id="admName">-</span>
+            </div>
             <div class="kv">
               <div class="k-row"><span class="k">TLS fingerprint (SHA-256)</span><span class="chip-warn" title="Self-signed certificate - verify this fingerprint">self-signed</span></div>
               <div class="fingerprint"><span class="v" id="admFp">-</span>
@@ -661,6 +665,8 @@
         $("admHost").textContent = s.hostName || s.address;
         $("admIface").textContent = (s.interfaceName ? s.interfaceName + " · " : "") + s.address;
         $("admFp").textContent = s.fingerprintSha256;
+        $("admNameRow").hidden = !s.localName;
+        if (s.localName) $("admName").textContent = "https://" + s.localName + ":" + s.port;
       }
     }).catch(()=>{});
   }

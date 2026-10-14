@@ -22,23 +22,23 @@ data class DiscoveredHub(
 
 /**
  * Advertises this hub as an mDNS/DNS-SD service so other devices can find it without being
- * told an IP. Desktop-only (JmDNS); the Android host will advertise via NsdManager later.
+ * told an IP, on the same responder that answers for its .local name ([LocalName]).
+ * Desktop-only; the Android host advertises the service via NsdManager.
  */
 class MdnsAdvertiser {
-    private var jmdns: JmDNS? = null
+    private val localName = LocalName()
 
-    fun start(bindAddress: InetAddress, instanceName: String, port: Int, txt: Map<String, String>) {
-        val jm = JmDNS.create(bindAddress)
+    /** The .local name this hub answers to (e.g. "servd.local"), once [start] has run. */
+    val hostName: String? get() = localName.current
+
+    /** Answer for [hostName] (null = only the machine's own name) and register the service. */
+    fun start(bindAddress: InetAddress, hostName: String?, instanceName: String, port: Int, txt: Map<String, String>) {
+        localName.start(bindAddress, hostName)
         val info = ServiceInfo.create(SERVD_MDNS_TYPE, instanceName, port, 0, 0, HashMap(txt))
-        jm.registerService(info)
-        jmdns = jm
+        localName.jmdns?.registerService(info)
     }
 
-    fun stop() {
-        runCatching { jmdns?.unregisterAllServices() }
-        runCatching { jmdns?.close() }
-        jmdns = null
-    }
+    fun stop() = localName.stop()
 }
 
 /** Browses the local network for servd hubs for a short window and returns what it found. */

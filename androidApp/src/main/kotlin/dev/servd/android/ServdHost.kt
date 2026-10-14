@@ -3,10 +3,12 @@ package dev.servd.android
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Environment
 import android.util.Log
 import dev.servd.core.Servd
+import dev.servd.core.discovery.LocalName
 import dev.servd.core.net.detectLanAddress
 import dev.servd.core.server.ServdServer
 import dev.servd.core.service.FtpService
@@ -15,6 +17,7 @@ import dev.servd.core.service.SshService
 import dev.servd.core.tls.ServdCertificates
 import io.ktor.server.netty.Netty
 import java.io.File
+import java.net.InetAddress
 
 /**
  * The running servd hub on this phone. A process-wide singleton: the foreground service owns its
@@ -36,6 +39,8 @@ object ServdHost {
         val sshPort: Int,
         val ftpPort: Int,
         val onLan: Boolean,
+        /** e.g. https://servd.local:8443, once the .local name is claimed; null if unavailable. */
+        val localUrl: String? = null,
     )
 
     @Volatile private var server: ServdServer<*, *>? = null
@@ -46,6 +51,8 @@ object ServdHost {
 
     private var nsd: NsdManager? = null
     private var nsdListener: NsdManager.RegistrationListener? = null
+    private val localName = LocalName()
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     /** Start the hub. Call off the main thread - it binds sockets and reads the filesystem. */
     @Synchronized
@@ -60,7 +67,8 @@ object ServdHost {
         val lan = detectLanAddress()
         val advertisedHost = lan?.ip ?: "127.0.0.1"
 
-        val tls = ServdCertificates.loadOrCreate(dataDir, listOfNotNull("127.0.0.1", lan?.ip))
+        // An existing keystore is reused as-is (stable fingerprint); a new one also lists servd.local.
+        val tls = ServdCertificates.loadOrCreate(dataDir, listOfNotNull("127.0.0.1", lan?.ip, "${LocalName.DEFAULT}.local"))
         val password = ServdCredentials.loadOrCreatePassword(dataDir)
         val ssh = SshService(
             port = SSH_PORT,
@@ -97,11 +105,15 @@ object ServdHost {
             onLan = lan != null,
         )
 
-        if (lan != null) registerMdns(context, advertisedHost, tls.fingerprintSha256)
+        if (lan != null) {
+            registerMdns(context, advertisedHost, tls.fingerprintSha256)
+            startLocalName(context, advertisedHost, srv)
+        }
     }
 
     @Synchronized
     fun stop() {
+        stopLocalName()
         unregisterMdns()
         server?.let { runCatching { it.stop() } }
         server = null
@@ -158,6 +170,26 @@ object ServdHost {
             nsd = manager
             nsdListener = listener
         }.onFailure { Log.w("servd", "mDNS unavailable", it) }
+    }
+
+    // Answer for servd.local (or servd-2.local... if taken) so devices that resolve .local names
+    // can open the hub by name. NsdManager can only advertise services, so this runs JmDNS, which
+    // needs a multicast lock to hear queries over Wi-Fi. Best-effort, like the service advert.
+    private fun startLocalName(context: Context, host: String, srv: ServdServer<*, *>) {
+        runCatching {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            multicastLock = wifi.createMulticastLock("servd-mdns").apply { setReferenceCounted(false); acquire() }
+            localName.start(InetAddress.getByName(host), LocalName.DEFAULT)
+            val name = localName.current ?: return
+            srv.localName = name
+            info = info?.copy(localUrl = "https://$name:$PORT")
+        }.onFailure { Log.w("servd", ".local name unavailable", it) }
+    }
+
+    private fun stopLocalName() {
+        localName.stop()
+        runCatching { multicastLock?.release() }
+        multicastLock = null
     }
 
     private fun unregisterMdns() {

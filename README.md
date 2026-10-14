@@ -61,8 +61,8 @@ tab. The tabs that configure the host appear only on the host itself.
   WebSockets and HMR/live reload work.
 - **SSH/SFTP and FTPS** (optional): FTPS uses explicit TLS. Both use a generated password and are
   limited to the shared files. There's no OS shell. Each tab shows a copyable connect command.
-- **Easy joining:** a scan-to-join QR code, plus mDNS discovery (`_servd._tcp`, or run
-  `servd discover`).
+- **Easy joining:** a scan-to-join QR code, a friendly **`https://servd.local:8443`** address over
+  mDNS, and mDNS discovery (`_servd._tcp`, or run `servd discover`).
 - **Join PIN** (optional): the host sets a 4-8 digit PIN, and other devices must enter it before
   they can use the hub, including the serve-site port. It's saved across restarts until turned
   off. Changing it signs everyone out.
@@ -105,6 +105,13 @@ the one you share.
 
 1. Put the other devices on the **same Wi-Fi**, or on the host's **hotspot**.
 2. On each device, open **`https://<serving-address>:8443`**, or scan the QR code in the dashboard.
+   iPhone/iPad, Mac, Windows 10+ and most Linux can also use **`https://servd.local:8443`**. Many
+   Android browsers can't resolve `.local` names, so use the IP or QR there.
+   - If another device on the network already uses `servd.local`, this hub takes the next free name
+     (e.g. `servd-1.local`). The banner, the **This host** card and the Android control screen show
+     the name in use.
+   - An existing certificate is kept, so its fingerprint doesn't change; only newly created
+     certificates list the name.
 3. Accept the certificate warning once the fingerprint matches, then pick a display name. Each
    device then appears in the **Devices** roster.
 
@@ -192,6 +199,7 @@ servd discover            # find hubs on the network without typing an IP
 | `--pin DIGITS` / `--pin off` | set (and save) or clear the join PIN | saved PIN, else off |
 | `--max-storage 10G` / `off` | drop-files quota (saved; `K`/`M`/`G` sizes) | saved, else none |
 | `--expire 1h\|24h\|7d` / `off` | auto-clear drop files after that age (saved) | saved, else off |
+| `--name NAME` / `off` | the `.local` name answered over mDNS (`--name myhub` → `myhub.local`) | `servd` |
 
 ## Security
 
@@ -230,7 +238,7 @@ servd/
 ├─ core/            Kotlin Multiplatform engine shared by desktop + Android
 │   ├─ commonMain     protocol models, PeerRegistry, LAN-address selection, Service model
 │   ├─ jvmSharedMain  Ktor server, TLS, chat hub, file store, folder browser, proxy, QR, SSH, FTP
-│   ├─ desktopMain    JmDNS discovery
+│   ├─ desktopMain    mDNS service advert + `servd discover` (JmDNS)
 │   ├─ androidMain    Android glue
 │   └─ resources/webui  the dashboard (one HTML/CSS/JS file)
 ├─ desktopHost/     the CLI that starts the hub (Netty engine)
@@ -252,6 +260,9 @@ servd/
   - `ServiceManager` starts, stops and toggles services, one call at a time.
   - `ChatHub` tracks who's connected and broadcasts chat, join/leave and roster events.
   - `JoinPin` (`jvmSharedMain`) holds the optional PIN, the sessions and the per-device lockout.
+  - `LocalName` (`jvmSharedMain`) answers mDNS lookups for the hub's `.local` name with JmDNS on
+    both platforms. On Android it holds a Wi-Fi multicast lock, and the service itself is still
+    advertised via `NsdManager`.
   - `FileStore` + `DropLimits` (`jvmSharedMain`) store drop files and enforce the free-space
     floor, the quota and auto-clear (swept every minute).
 - **Request flow**:
@@ -288,7 +299,7 @@ Exact versions are pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.
 | Net | `java.net.NetworkInterface` | JDK | LAN/hotspot address detection |
 | SSH | Apache MINA SSHD | `2.13.2` | SSH/SFTP server |
 | FTP | Apache FtpServer | `1.2.0` | FTPS server |
-| Discovery | JmDNS / `NsdManager` (Android) | `3.5.9` | mDNS/DNS-SD |
+| Discovery | JmDNS / `NsdManager` (Android) | `3.5.9` | mDNS/DNS-SD; the `.local` name (JmDNS on both) |
 | QR | ZXing | `3.5.3` | scan-to-join QR |
 | Data | kotlinx.serialization | `1.7.3` | JSON WebSocket protocol |
 | Async | kotlinx.coroutines | `1.9.0` | async server + guarded broadcast |
