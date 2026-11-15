@@ -858,6 +858,7 @@
     const groups=groupFiles();
     const ups=[...uploads.entries()];
     fbadge.style.display = groups.length ? "" : "none"; fbadge.textContent=groups.length;
+    if(usage) renderUsage(usage); // keep the file count in step with the list
     $("filesDot").classList.toggle("on", groups.length>0);
     $("dlAllBtn").disabled = !groups.length; // nothing to download yet
     if(!groups.length && !ups.length){ flist.innerHTML='<div class="files-empty">No files shared yet.</div>'; return; }
@@ -939,7 +940,8 @@
     usage=u;
     const el=$("dropUsage");
     const used = fmtSize(u.usedBytes)+(u.maxBytes ? " of "+fmtSize(u.maxBytes) : "")+" used";
-    const parts = u.roomBytes>0 ? [used, fmtSize(u.roomBytes)+" free"] : [used, "hub storage is full"];
+    const n=files.size; // every file, folder contents included (the tab badge counts rows)
+    const parts = [n+" file"+(n===1?"":"s"), used, u.roomBytes>0 ? fmtSize(u.roomBytes)+" free" : "hub storage is full"];
     if(u.expireHours) parts.push("files clear after "+fmtHours(u.expireHours));
     el.textContent=parts.join(" · ");
     el.classList.toggle("full", u.roomBytes<=0);
