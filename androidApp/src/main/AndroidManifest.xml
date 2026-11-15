@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In-app updates: hand a downloaded release APK (same signing key) to the system installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- "File browsing": serve the phone's storage. All-files access on 11+, legacy read/write below. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
@@ -26,6 +28,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".InstallStatusActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
 
         <service
             android:name=".ServdHostService"

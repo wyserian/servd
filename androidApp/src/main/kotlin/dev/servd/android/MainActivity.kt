@@ -2,6 +2,7 @@ package dev.servd.android
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -33,6 +34,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import dev.servd.core.Servd
+import dev.servd.core.update.Update
 
 /**
  * servd's Android control screen - a thin native shell. The real UI is the served web dashboard;
@@ -49,6 +51,9 @@ class MainActivity : Activity() {
     private lateinit var openButton: Button
     private lateinit var copyButton: Button
     private lateinit var storageButton: Button
+    private lateinit var updateButton: Button
+    private var update: Update? = null
+    private var updating = false
 
     private val ink = Color.parseColor("#0F1A1F")
     private val muted = Color.parseColor("#5A6B72")
@@ -62,6 +67,57 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
         render()
+        Thread {
+            val found = Updater.check(applicationContext) ?: return@Thread
+            runOnUiThread {
+                update = found
+                updateButton.text = "Update to v${found.version}"
+                updateButton.visibility = View.VISIBLE
+            }
+        }.start()
+    }
+
+    // ---- in-app update (see Updater; the installer replies to InstallStatusActivity)
+
+    private fun startUpdate() {
+        val u = update ?: return
+        if (updating) return
+        if (!packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(this, "Allow servd to install updates, then tap Update again", Toast.LENGTH_LONG).show()
+            runCatching {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            }
+            return
+        }
+        if (ServdHost.isRunning) {
+            AlertDialog.Builder(this)
+                .setTitle("Update servd?")
+                .setMessage("The hub stops while servd updates. Start it again afterwards.")
+                .setPositiveButton("Update") { _, _ -> download(u) }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            download(u)
+        }
+    }
+
+    private fun download(u: Update) {
+        updating = true
+        updateButton.isEnabled = false
+        updateButton.text = "Downloading v${u.version}..."
+        Thread {
+            val result = runCatching {
+                Updater.install(applicationContext, u) { pct ->
+                    runOnUiThread { updateButton.text = "Downloading v${u.version}... $pct%" }
+                }
+            }
+            runOnUiThread {
+                updating = false
+                updateButton.isEnabled = true
+                updateButton.text = "Update to v${u.version}"
+                result.onFailure { Toast.makeText(this, "Update failed: ${it.message}", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     override fun onResume() {
@@ -149,6 +205,9 @@ class MainActivity : Activity() {
         }
         card.addView(detailText)
         root.addView(card)
+
+        updateButton = button("Update", Color.WHITE, accent) { startUpdate() }.apply { visibility = View.GONE }
+        root.addView(updateButton)
 
         root.addView(TextView(this).apply {
             text = "v${Servd.VERSION}"
