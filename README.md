@@ -88,7 +88,7 @@ Desktop builds bundle their own Java runtime, so nothing else is needed. To buil
 On start, servd prints:
 
 ```
-servd v1.7.0 - your device, as a local-network hub
+servd v1.8.0 - your device, as a local-network hub
 
 admin   : https://127.0.0.1:8443/?admin=…   (this machine only - keep the link private)
 serving : https://10.205.210.12:8443   (share with other devices)
@@ -503,7 +503,7 @@ keytool -genkeypair -v -keystore servd-release.jks -alias servd -keyalg RSA -key
 2. Commit, then tag `v<servdVersion>` and push:
 
 ```bash
-git tag v1.7.0 && git push origin v1.7.0
+git tag v1.8.0 && git push origin v1.8.0
 ```
 
 [`release.yml`](.github/workflows/release.yml) checks that the tag matches the version. It then
