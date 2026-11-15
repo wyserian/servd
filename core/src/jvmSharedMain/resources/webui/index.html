@@ -286,6 +286,29 @@
   .drawer-foot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .drawer-ver { margin-left: auto; color: var(--faint); }
   .host-settings { display: flex; flex-direction: column; gap: 10px; }
+  /* live streams */
+  /* one column; on large screens "Live now" moves to a column on the right */
+  .stream-layout { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+  .stream-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  @media (min-width: 1100px) {
+    .stream-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; max-width: 1200px; }
+  }
+  .set-sec[hidden], #liveIdle[hidden] { display: none; }
+  .sync-opt { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  #playPick, #playUrl { flex: 1; min-width: 0; }
+  #npMedia iframe.stream-video { display: block; aspect-ratio: 16 / 9; height: auto; border: 0; }
+  #npMedia audio { width: 100%; }
+  .np-actions { justify-content: flex-start; gap: 8px; }
+  .stream-video { width: 100%; max-height: 60vh; background: #000; border-radius: var(--r-sm); }
+  .stream-video[hidden] { display: none; }
+  .audio-only { padding: 26px 12px; text-align: center; border-radius: var(--r-sm); background: var(--surface); font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .audio-only[hidden] { display: none; }
+  .live-badge { color: var(--error); text-transform: uppercase; }
+  .live-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .live-row + .live-row { border-top: 1px solid var(--border); }
+  .live-row .lr-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .live-row .lr-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .sys .mini-btn { margin-left: 8px; min-height: 24px; padding: 0 8px; }
   .host-settings[hidden] { display: none; }
   .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .pref-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -517,6 +540,7 @@
         <div class="tabs" role="tablist">
           <button class="tab" role="tab" aria-selected="true" data-view="files"><span class="tdot" id="filesDot"></span>drop files<span class="badge" id="fbadge" style="display:none">0</span></button>
           <button class="tab" role="tab" aria-selected="false" data-view="chat"><span class="tdot" id="chatDot"></span>chat<span class="badge" id="cbadge" style="display:none" aria-label="unread messages">0</span></button>
+          <button class="tab" role="tab" aria-selected="false" data-view="stream"><span class="tdot" id="streamDot"></span>stream</button>
           <button class="tab" role="tab" aria-selected="false" data-view="sharing" id="sharingTab" hidden><span class="tdot" id="sharingDot"></span>browse files</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="live" id="liveTab" hidden><span class="tdot" id="liveDot"></span>serve site</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ftp" id="ftpTab" hidden><span class="tdot" id="ftpDot"></span>ftp</button>
@@ -554,6 +578,77 @@
             </div>
             <div class="flist" id="flist"><div class="files-empty">No files shared yet.</div></div>
           </div>
+        </div>
+
+        <!-- live streams: WebRTC peer to peer; the hub only relays setup messages -->
+        <div class="view" id="view-stream" role="tabpanel">
+          <div class="cfg-wrap"><div class="stream-layout">
+            <div class="stream-main">
+            <div class="form-err" id="liveErr" role="alert" hidden></div>
+            <!-- host only: other devices can only watch -->
+            <section class="set-sec" id="goLiveBox" aria-labelledby="goLiveH" hidden>
+              <div class="set-head"><h3 id="goLiveH">Go live</h3><span class="pin-state">up to <span id="liveMax">10</span> viewers</span></div>
+              <div class="pref-row">
+                <div class="seg" role="radiogroup" aria-label="What to stream">
+                  <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
+                  <button type="button" role="radio" data-live-kind="audio" aria-checked="false">microphone</button>
+                  <button type="button" role="radio" data-live-kind="screen" aria-checked="false" id="kindScreen">screen</button>
+                </div>
+                <button class="mini-btn btn-primary" id="goLive" type="button">go live</button>
+              </div>
+            </section>
+
+            <!-- host only: play a shared video/audio file for everyone -->
+            <section class="set-sec" id="playBox" aria-labelledby="playH" hidden>
+              <div class="set-head"><h3 id="playH">Play a file for everyone</h3>
+                <label class="sync-opt"><input type="checkbox" id="npSync" checked /> keep everyone in sync</label></div>
+              <div class="pref-row">
+                <select class="sto-input" id="playPick" aria-label="A shared video or audio file"></select>
+                <button class="mini-btn btn-primary" id="playShared" type="button" disabled>play</button>
+              </div>
+              <div class="pref-row">
+                <span class="pin-note">Not shared yet?</span>
+                <button class="mini-btn" id="playUpload" type="button">choose a video or audio file…</button>
+                <input type="file" id="playInput" accept="video/*,audio/*" hidden />
+              </div>
+              <div class="pref-row">
+                <input class="sto-input" id="playUrl" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="or paste a link: YouTube, or https://…/video.mp4" aria-label="A YouTube or video/audio link" />
+                <button class="mini-btn btn-primary" id="playLink" type="button" disabled>play link</button>
+              </div>
+              <div class="pin-note">Links stream from the internet on each device, so every device needs internet access.</div>
+            </section>
+
+            <section class="set-sec" id="nowPlaying" hidden>
+              <div class="set-head"><h3 id="npTitle">-</h3><span class="pin-state" id="npState">-</span></div>
+              <div id="npMedia"></div>
+              <div class="pref-row np-actions">
+                <button class="mini-btn btn-primary" id="npJoin" type="button" hidden>join playback</button>
+                <button class="mini-btn" id="npResync" type="button" hidden>resync</button>
+                <button class="mini-btn btn-danger" id="npStop" type="button" hidden>stop for everyone</button>
+              </div>
+            </section>
+
+            <section class="set-sec" id="myLive" hidden>
+              <div class="set-head"><h3><span class="live-badge">● live</span></h3><span class="pin-state" id="myViewers">0 watching</span></div>
+              <video class="stream-video" id="myPreview" muted playsinline autoplay></video>
+              <div class="audio-only" id="myAudioOnly" hidden>microphone only</div>
+              <button class="mini-btn btn-danger" id="stopLive" type="button">stop</button>
+            </section>
+
+            <section class="set-sec" id="watching" hidden>
+              <div class="set-head"><h3 id="watchTitle">-</h3><span class="pin-state" id="watchState">connecting…</span></div>
+              <video class="stream-video" id="watchVideo" playsinline controls></video>
+              <div class="audio-only" id="watchAudioOnly" hidden>audio only</div>
+              <button class="mini-btn" id="stopWatch" type="button">leave</button>
+            </section>
+            <div class="files-empty" id="liveIdle" hidden>Pick a stream from Live now to watch it.</div>
+            </div>
+
+            <section class="set-sec stream-side" aria-labelledby="liveNowH">
+              <div class="set-head"><h3 id="liveNowH">Live now</h3></div>
+              <div id="liveList"><div class="files-empty">Nothing is live right now.</div></div>
+            </section>
+          </div></div>
         </div>
 
         <div class="view" id="view-sharing" role="tabpanel">
@@ -883,6 +978,7 @@
         row.innerHTML=(thumb ? '<button type="button" class="fi fthumb" data-open="'+esc(f.id)+'" title="View"><img loading="lazy" alt="" src="'+fileUrl(f)+'"></button>' : '<span class="fi">'+esc(ext(f.name))+'</span>')+
           '<div class="fmeta"><div class="fname">'+esc(f.name)+'</div><div class="fsub">from '+esc(f.fromName)+' &middot; '+time(f.ts)+'</div></div>'+
           '<span class="fsize">'+fmtSize(f.size)+'</span>'+
+          (hostMode && mediaKindOf(f) ? '<button class="dl" type="button" data-playall="'+esc(f.id)+'" title="Play for everyone">'+PLAYICON+'</button>' : '')+
           '<a class="dl" href="/files/'+encodeURIComponent(f.id)+'" download="'+esc(f.name)+'" title="Download">'+DLICON+'</a>'+
           '<button class="dl del" data-del="'+esc(f.id)+'" title="Delete">'+XICON+'</button>';
         flist.appendChild(row); continue;
@@ -919,6 +1015,8 @@
     }));
     flist.querySelectorAll('button[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelUpload(b.dataset.cancel)));
     flist.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{ const f=files.get(b.dataset.open); if(f) openViewer(f); }));
+    flist.querySelectorAll("[data-playall]").forEach(b=>b.addEventListener("click",()=>{ playForEveryone(b.dataset.playall); selectView("stream"); }));
+    if(hostMode) refreshPlayPick();
   }
   function updateUpRow(id){
     const u=uploads.get(id); if(!u) return;
@@ -1168,6 +1266,7 @@
     hostMode = host;
     $("liveTab").hidden = !host; $("ftpTab").hidden = !host; $("sshTab").hidden = !host;
     $("hostSettings").hidden = !host; // the settings drawer's host-only sections
+    syncLiveUi(); scheduleRender(); // only the host can go live or play files for everyone
     updateSharingTab();
     if(!host && ["live","ftp","ssh"].includes(activeView())) document.querySelector('.tab[data-view="files"]').click();
   }
@@ -1486,12 +1585,318 @@
   textInput.addEventListener("input",autoGrow);
   autoGrow(); // set the initial height/overflow so a single line never shows a scrollbar
 
+  // ---- live streams ----
+  // WebRTC peer to peer: the streamer sends media straight to each viewer over the LAN; the hub
+  // only keeps the list of who is live and relays the setup messages (SDP, ICE) between the two.
+  const RTC_CFG={iceServers:[]}; // LAN only: no STUN/TURN servers, so it works fully offline
+  const KIND_LABEL={camera:"camera", audio:"microphone", screen:"screen"};
+  let liveStreams=[], liveSeen=null, liveById=new Map(); // liveSeen: ids in the last list (null until the first)
+  let liveKind="camera", myStream=null;
+  const myPeers=new Map(); // as streamer: viewerId -> RTCPeerConnection
+  let watch=null;          // as viewer: {s, pc}
+  let sigChain=Promise.resolve(); // setup messages are applied strictly in order
+
+  function wsSend(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
+  function liveErr(msg){ const e=$("liveErr"); e.textContent=msg||""; e.hidden=!msg; }
+  // Go live is host-only; a guest who isn't watching gets a hint instead of an empty column.
+  function syncLiveUi(){ $("goLiveBox").hidden = !hostMode || !!myStream; $("playBox").hidden = !hostMode; $("liveIdle").hidden = hostMode || !!watch || !!np; }
+
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) $("kindScreen").hidden=true; // phones can't share their screen
+  document.querySelectorAll("[data-live-kind]").forEach(b=>b.addEventListener("click",()=>{
+    liveKind=b.dataset.liveKind;
+    document.querySelectorAll("[data-live-kind]").forEach(x=>x.setAttribute("aria-checked", x===b));
+  }));
+
+  function renderLive(m){
+    const prev=liveSeen;
+    liveStreams=m.streams; liveSeen=new Set(m.streams.map(s=>s.id)); $("liveMax").textContent=m.maxViewers;
+    if(prev){ // announce changes that happened while we were here (not what was already live on join)
+      for(const s of m.streams) if(!prev.has(s.id) && s.ownerId!==selfId) addLiveMsg(s);
+      for(const id of prev) if(!liveSeen.has(id)){ const s=liveById.get(id); if(s && s.ownerId!==selfId) addSys(s.ownerName+"'s live stream ended"); }
+    }
+    liveById=new Map(m.streams.map(s=>[s.id,s]));
+    updateStreamDot();
+    const mine=m.streams.find(s=>s.ownerId===selfId);
+    if(mine) $("myViewers").textContent=mine.viewers+" watching";
+    if(watch && !liveSeen.has(watch.s.id)) endWatch("The stream ended.");
+    const others=m.streams.filter(s=>s.ownerId!==selfId);
+    const list=$("liveList");
+    if(!others.length){ list.innerHTML='<div class="files-empty">Nothing is live right now.</div>'; return; }
+    list.innerHTML=others.map(s=>{
+      const full=s.viewers>=m.maxViewers, here=watch&&watch.s.id===s.id;
+      return '<div class="live-row"><span class="lr-name"><span class="live-badge">●</span> '+esc(s.ownerName)+'</span>'+
+        '<span class="lr-meta">'+KIND_LABEL[s.kind]+' · '+s.viewers+'/'+m.maxViewers+'</span>'+
+        '<button class="mini-btn btn-primary" type="button" data-watch="'+esc(s.id)+'"'+(here||full?' disabled':'')+'>'+(here?'watching':full?'full':'watch')+'</button></div>';
+    }).join("");
+    list.querySelectorAll("button[data-watch]").forEach(b=>b.addEventListener("click",()=>{ const s=liveById.get(b.dataset.watch); if(s) watchStream(s); }));
+  }
+  function addLiveMsg(s){
+    const stick=atBottom(); const el=document.createElement("div"); el.className="sys";
+    el.textContent="- "+s.ownerName+" is live ("+KIND_LABEL[s.kind]+") -";
+    const b=document.createElement("button"); b.className="mini-btn btn-primary"; b.type="button"; b.textContent="watch";
+    b.addEventListener("click",()=>{ const cur=liveById.get(s.id); if(!cur) return addSys("that stream has ended"); selectView("stream"); watchStream(cur); });
+    el.appendChild(b); log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
+    noteActivity(s.ownerName, "is live ("+KIND_LABEL[s.kind]+")", "stream");
+  }
+
+  // As streamer
+  async function goLive(){
+    liveErr(""); const kind=liveKind, md=navigator.mediaDevices;
+    if(!md){ liveErr("This browser can't stream from here."); return; }
+    try{
+      myStream = kind==="screen" ? await md.getDisplayMedia({video:true, audio:true})
+                                 : await md.getUserMedia(kind==="audio" ? {audio:true} : {video:true, audio:true});
+    }catch(e){
+      liveErr(e && e.name==="NotAllowedError" ? "Permission was denied. Allow the "+KIND_LABEL[kind]+" in the browser, then try again." : "Couldn't start the "+KIND_LABEL[kind]+".");
+      return;
+    }
+    myStream.getTracks().forEach(t=>t.addEventListener("ended", stopLive)); // e.g. "stop sharing" in the browser bar
+    $("myPreview").srcObject=myStream; $("myPreview").hidden = kind==="audio"; $("myAudioOnly").hidden = kind!=="audio";
+    $("myLive").hidden=false; syncLiveUi(); $("myViewers").textContent="0 watching";
+    wsSend({type:"liveStart", kind});
+  }
+  function stopLive(local){
+    if(!myStream) return;
+    if(local!==true) wsSend({type:"liveStop"});
+    myStream.getTracks().forEach(t=>t.stop()); myStream=null;
+    for(const pc of myPeers.values()) pc.close(); myPeers.clear();
+    $("myPreview").srcObject=null; $("myLive").hidden=true; syncLiveUi();
+  }
+  async function onViewer(m){
+    const old=myPeers.get(m.viewerId); if(old){ old.close(); myPeers.delete(m.viewerId); }
+    if(!m.joined || !myStream) return;
+    const pc=new RTCPeerConnection(RTC_CFG); myPeers.set(m.viewerId, pc);
+    myStream.getTracks().forEach(t=>pc.addTrack(t, myStream));
+    pc.onicecandidate=e=>{ if(e.candidate) wsSend({type:"signal", to:m.viewerId, stream:m.stream, data:{ice:e.candidate}}); };
+    await pc.setLocalDescription(await pc.createOffer());
+    wsSend({type:"signal", to:m.viewerId, stream:m.stream, data:{sdp:pc.localDescription}});
+  }
+  // Each viewer costs the streamer one upload, so keep video at a LAN-friendly rate.
+  function capBitrate(pc){
+    for(const s of pc.getSenders()) if(s.track && s.track.kind==="video"){
+      const p=s.getParameters(); if(!p.encodings || !p.encodings.length) p.encodings=[{}];
+      p.encodings[0].maxBitrate=2500000; s.setParameters(p).catch(()=>{});
+    }
+  }
+
+  // As viewer
+  function watchStream(s){
+    if(watch) endWatch();
+    liveErr("");
+    const pc=new RTCPeerConnection(RTC_CFG); watch={s, pc};
+    pc.ontrack=e=>{ const v=$("watchVideo"); if(v.srcObject!==e.streams[0]){ v.srcObject=e.streams[0]; v.play().catch(()=>{}); } $("watchState").textContent=KIND_LABEL[s.kind]; };
+    pc.onicecandidate=e=>{ if(e.candidate) wsSend({type:"signal", to:s.ownerId, stream:s.id, data:{ice:e.candidate}}); };
+    pc.onconnectionstatechange=()=>{
+      if(pc.connectionState==="failed") endWatch("Couldn't connect to the stream. This network may block device-to-device traffic.");
+    };
+    $("watchTitle").textContent=s.ownerName; $("watchState").textContent="connecting…";
+    $("watchVideo").hidden = s.kind==="audio"; $("watchAudioOnly").hidden = s.kind!=="audio";
+    $("watching").hidden=false; syncLiveUi();
+    wsSend({type:"liveWatch", id:s.id});
+    renderLive({streams:liveStreams, maxViewers:+$("liveMax").textContent}); // mark it as watching
+  }
+  function endWatch(msg){
+    if(!watch) return;
+    wsSend({type:"liveLeave", id:watch.s.id});
+    watch.pc.close(); watch=null;
+    $("watchVideo").srcObject=null; $("watching").hidden=true; syncLiveUi();
+    if(msg) liveErr(msg);
+    renderLive({streams:liveStreams, maxViewers:+$("liveMax").textContent});
+  }
+
+  // Setup messages for either role, applied in order (an ICE candidate may arrive before the
+  // offer it belongs to has been applied).
+  function onSignal(m){ sigChain=sigChain.then(()=>applySignal(m)).catch(()=>{}); }
+  async function applySignal(m){
+    const d=m.data||{};
+    if(watch && m.from===watch.s.ownerId && m.stream===watch.s.id){
+      const pc=watch.pc;
+      if(d.sdp){ await pc.setRemoteDescription(d.sdp); await pc.setLocalDescription(await pc.createAnswer());
+                 wsSend({type:"signal", to:m.from, stream:m.stream, data:{sdp:pc.localDescription}}); }
+      else if(d.ice) await pc.addIceCandidate(d.ice);
+      return;
+    }
+    const pc=myPeers.get(m.from); if(!pc) return;
+    if(d.sdp){ await pc.setRemoteDescription(d.sdp); capBitrate(pc); }
+    else if(d.ice) await pc.addIceCandidate(d.ice);
+  }
+
+  // ---- play a shared file for everyone ----
+  // Every device streams the file from the hub (/files/{id}). With sync on, the host's player is
+  // the reference: it reports play/pause/seek (and a heartbeat), the hub forwards it, and viewers
+  // follow within half a second. A viewer who pauses or seeks themselves stops following until
+  // they press resync.
+  const PLAYICON='<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  let np=null; // {info, el, recvAt, owner, joined, diverged, applying, timer}
+  function mediaKindOf(f){ const k=previewKind(f); return k==="video"||k==="audio" ? k : null; }
+  function playForEveryone(fileId){ liveErr(""); wsSend({type:"mediaPlay", fileId}); }
+  function refreshPlayPick(){
+    const sel=$("playPick"), cur=sel.value;
+    const media=[...files.values()].filter(mediaKindOf).sort((a,b)=>b.ts-a.ts);
+    sel.innerHTML = media.length ? media.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.path||f.name)+'</option>').join("")
+                                 : '<option value="">no shared video or audio yet</option>';
+    if(media.some(f=>f.id===cur)) sel.value=cur;
+    $("playShared").disabled=!media.length;
+  }
+  function npTarget(){ const i=np.info; return i.position + (i.playing ? (i.ageMs + performance.now() - np.recvAt)/1000 : 0); }
+  function sendMediaState(){ if(np && np.owner) wsSend({type:"mediaState", playing:!np.el.paused, position:np.el.currentTime, sync:$("npSync").checked}); }
+  function applyRemote(){
+    if(!np || np.owner || !np.joined || np.diverged || !np.info.sync) return;
+    const el=np.el, target=npTarget();
+    np.applying=true;
+    if(Math.abs(el.currentTime-target)>0.5) el.currentTime=target;
+    if(np.info.playing && el.paused) el.play().catch(()=>{ if(np){ np.joined=false; renderNp(); } }); // sound needs a tap
+    if(!np.info.playing && !el.paused) el.pause();
+    clearTimeout(np.applyTimer); np.applyTimer=setTimeout(()=>{ if(np) np.applying=false; }, 400);
+  }
+  function teardownNp(){
+    if(!np) return;
+    clearInterval(np.timer); clearTimeout(np.applyTimer);
+    if(np.el.destroy) np.el.destroy(); else { np.el.pause(); np.el.removeAttribute("src"); np.el.load(); }
+    $("npMedia").innerHTML=""; np=null;
+  }
+
+  // A YouTube video in YouTube's own embedded player, wrapped to look like a <video> element to
+  // the sync code (currentTime, paused, play/pause, play/pause/seeked events). It talks to the
+  // embed through YouTube's postMessage protocol, so no YouTube script runs in our page.
+  function makeYouTube(videoId, mount){
+    const f=document.createElement("iframe");
+    f.className="stream-video"; f.title="YouTube video";
+    f.allow="autoplay; encrypted-media; fullscreen; picture-in-picture"; f.allowFullscreen=true;
+    f.src="https://www.youtube-nocookie.com/embed/"+encodeURIComponent(videoId)+"?enablejsapi=1&playsinline=1&rel=0&origin="+encodeURIComponent(location.origin);
+    mount.appendChild(f);
+    const handlers={}; let state=-1, time=0, timeAt=performance.now(), ready=false, queued=[];
+    const emit=ev=>(handlers[ev]||[]).forEach(h=>h());
+    const post=msg=>{ if(f.contentWindow) f.contentWindow.postMessage(JSON.stringify(msg), "*"); };
+    // Commands sent before the embed has answered are dropped by it, so hold them until then.
+    const command=(func,args)=>{ const msg={event:"command", func, args:args||[]}; if(ready) post(msg); else queued.push(msg); };
+    const setState=s=>{ if(s===state) return; state=s; if(s===1) emit("play"); else if(s===2||s===0) emit("pause"); };
+    const w={
+      get currentTime(){ return time+(state===1 ? (performance.now()-timeAt)/1000 : 0); },
+      set currentTime(t){ command("seekTo",[t,true]); time=t; timeAt=performance.now(); },
+      get paused(){ return state!==1 && state!==3; }, // 1 playing, 3 buffering
+      play(){ command("playVideo"); return Promise.resolve(); },
+      pause(){ command("pauseVideo"); },
+      addEventListener(ev,h){ (handlers[ev]=handlers[ev]||[]).push(h); },
+      destroy(){ clearInterval(hello); window.removeEventListener("message", onMsg); f.remove(); },
+    };
+    function onMsg(e){
+      if(e.source!==f.contentWindow) return; // only our embed
+      let d; try{ d=typeof e.data==="string" ? JSON.parse(e.data) : e.data; }catch{ return; }
+      if(!d || typeof d!=="object") return;
+      if(!ready && (d.event==="onReady" || d.event==="initialDelivery" || d.event==="infoDelivery")){
+        ready=true; queued.forEach(post); queued=[]; // it's listening now
+      }
+      if(d.event==="onError") emit("error");
+      if(d.event==="onStateChange" && typeof d.info==="number") setState(d.info);
+      if((d.event==="infoDelivery" || d.event==="initialDelivery") && d.info){
+        const i=d.info;
+        if(typeof i.currentTime==="number"){
+          const jumped=Math.abs(i.currentTime-w.currentTime)>1.5;
+          time=i.currentTime; timeAt=performance.now();
+          if(jumped) emit("seeked");
+        }
+        if(typeof i.playerState==="number") setState(i.playerState);
+        if(i.videoData && i.videoData.title && i.videoData.title!==w.title){ w.title=i.videoData.title; emit("title"); }
+      }
+    }
+    window.addEventListener("message", onMsg);
+    // The embed only starts reporting once a "listening" message reaches it; keep saying it until it does.
+    const hello=setInterval(()=>{ if(ready) clearInterval(hello); else post({event:"listening", id:1, channel:"widget"}); }, 250);
+    return w;
+  }
+  function onMediaSession(m){
+    const info=m.session;
+    if(!info){ if(np){ if(!np.owner) addSys(np.info.name+" stopped playing"); teardownNp(); } renderNp(); return; }
+    if(linkPending && !info.fileId && info.ownerId===selfId){ clearTimeout(linkPending); linkPending=0; $("playUrl").value=""; $("playLink").disabled=true; }
+    if(!np || np.info.src!==info.src){
+      teardownNp();
+      const owner=info.ownerId===selfId;
+      let el;
+      if(info.kind==="youtube") el=makeYouTube(info.src, $("npMedia"));
+      else {
+        el=document.createElement(info.kind==="audio" ? "audio" : "video");
+        el.controls=true; el.preload="auto"; el.playsInline=true; el.src=info.src; // "/files/{id}" or an https link
+        if(info.kind!=="audio") el.className="stream-video";
+        $("npMedia").appendChild(el);
+      }
+      np={info, el, recvAt:performance.now(), owner, joined:owner, diverged:false, applying:false};
+      el.addEventListener("error", ()=>liveErr(info.fileId ? "This file can't be played in this browser." : "This link can't be played here (it may be offline, blocked, or not allow embedding)."));
+      el.addEventListener("title", ()=>{ if(np && np.el===el){ np.title=el.title; renderNp(); } }); // YouTube reports its title
+      if(owner){
+        ["play","pause","seeked","ratechange"].forEach(ev=>el.addEventListener(ev, sendMediaState));
+        np.timer=setInterval(()=>{ if(np && !np.el.paused) sendMediaState(); }, 5000); // heartbeat keeps viewers' drift small
+        el.play().catch(()=>{});
+      } else {
+        // A pause/play/seek the viewer made themselves (not ours from applyRemote) = they've gone their own way.
+        const mine=()=>np && np.joined && !np.applying && np.info.sync;
+        el.addEventListener("pause", ()=>{ if(mine() && np.info.playing){ np.diverged=true; renderNp(); } });
+        el.addEventListener("play",  ()=>{ if(mine() && !np.info.playing){ np.diverged=true; renderNp(); } });
+        el.addEventListener("seeked",()=>{ if(mine() && Math.abs(el.currentTime-npTarget())>2){ np.diverged=true; renderNp(); } });
+        addSys("the host is playing "+info.name+" for everyone");
+        noteActivity("host", "is playing "+info.name+" for everyone", "stream");
+      }
+    } else { np.info=info; np.recvAt=performance.now(); }
+    renderNp();
+    applyRemote();
+  }
+  function renderNp(){
+    $("nowPlaying").hidden=!np; syncLiveUi(); updateStreamDot();
+    if(!np) return;
+    const i=np.info;
+    $("npTitle").textContent=np.title||i.name;
+    $("npState").textContent=(np.owner ? "you're playing this · " : "")+(i.sync ? (i.playing ? "playing" : "paused")+" · in sync" : "everyone plays at their own pace");
+    $("npJoin").hidden = np.owner || !i.sync || np.joined;
+    $("npResync").hidden = np.owner || !i.sync || !np.joined || !np.diverged;
+    $("npStop").hidden = !np.owner;
+  }
+  function updateStreamDot(){ $("streamDot").classList.toggle("on", liveStreams.length>0 || !!np); }
+
+  $("npJoin").addEventListener("click", ()=>{ if(!np) return; np.joined=true; np.diverged=false; renderNp(); applyRemote(); });
+  $("npResync").addEventListener("click", ()=>{ if(!np) return; np.diverged=false; renderNp(); applyRemote(); });
+  $("npStop").addEventListener("click", ()=>wsSend({type:"mediaStop"}));
+  $("npSync").addEventListener("change", sendMediaState);
+  $("playShared").addEventListener("click", ()=>{ if($("playPick").value) playForEveryone($("playPick").value); });
+  // Links: the hub validates them (https only; YouTube becomes just a video id), so check the basics here.
+  $("playUrl").addEventListener("input", ()=>{ $("playLink").disabled = !/^https:\/\/\S+$/i.test($("playUrl").value.trim()); liveErr(""); });
+  $("playUrl").addEventListener("keydown", e=>{ if(e.key==="Enter" && !$("playLink").disabled) $("playLink").click(); });
+  // The hub answers an accepted link with a new playback session and says nothing when it refuses
+  // one, so no session within 1.5 s means it was refused.
+  let linkPending=0;
+  $("playLink").addEventListener("click", ()=>{
+    liveErr(""); clearTimeout(linkPending);
+    linkPending=setTimeout(()=>{ linkPending=0; liveErr("That link can't be played. Use a YouTube link or an https link to a video/audio file."); }, 1500);
+    wsSend({type:"mediaPlayUrl", url:$("playUrl").value.trim()});
+  });
+  $("playUpload").addEventListener("click", ()=>$("playInput").click());
+  $("playInput").addEventListener("change", ()=>{
+    const fi=$("playInput"), file=fi.files[0]; fi.value=""; if(!file) return;
+    const b=$("playUpload"); b.disabled=true; b.textContent="uploading…"; liveErr("");
+    const fd=new FormData(); fd.append("from", userName); fd.append("file", file, file.name);
+    fetch("/files", {method:"POST", body:fd})
+      .then(r=>r.json().then(j=>{ if(!r.ok) throw r.status; return j; }))
+      .then(saved=>{ if(saved[0]) playForEveryone(saved[0].id); })
+      .catch(st=>liveErr(st===413 ? "Not enough space on the hub for that file." : "Couldn't upload that file."))
+      .finally(()=>{ b.disabled=false; b.textContent="choose a video or audio file…"; });
+  });
+
+  $("goLive").addEventListener("click", goLive);
+  $("stopLive").addEventListener("click", ()=>stopLive());
+  $("stopWatch").addEventListener("click", ()=>endWatch());
+
   // ---- websocket ----
   function connect(){
     ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
     ws.onopen=()=>{ setConn(true); sayHello(); loadStatus(); loadBrowseInfo(); };
     // Reconnect - unless the hub now wants a PIN (it was set or changed), then show the PIN screen.
-    ws.onclose=()=>{ setConn(false); clearTimeout(retry); retry=setTimeout(()=>checkAuth().then(ok=>{ if(ok) connect(); }),1500); };
+    ws.onclose=()=>{
+      setConn(false); clearTimeout(retry); retry=setTimeout(()=>checkAuth().then(ok=>{ if(ok) connect(); }),1500);
+      // the hub ended our stream / dropped us as a viewer along with the connection
+      if(myStream){ stopLive(true); liveErr("Connection to the hub was lost, so the live stream stopped."); }
+      if(watch) endWatch("Connection to the hub was lost.");
+      if(np && np.owner){ teardownNp(); renderNp(); } // the hub ends playback when its host leaves
+      liveSeen=null; // don't announce what's live when we reconnect
+    };
     ws.onerror=()=>ws.close();
     ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data); }catch{ return; }
       switch(m.type){
@@ -1504,6 +1909,11 @@
         case "fileRemoved": files.delete(m.id); scheduleRender(); scheduleUsage(); break;
         case "filesRemoved": m.ids.forEach(id=>files.delete(id)); scheduleRender(); scheduleUsage(); break;
         case "filesCleared": files.clear(); scheduleRender(); scheduleUsage(); addSys("files cleared by "+esc(m.byName)); break;
+        case "liveList": renderLive(m); break;
+        case "liveViewer": onViewer(m); break;
+        case "liveFull": endWatch("That stream is full ("+$("liveMax").textContent+" viewers)."); break;
+        case "signal": onSignal(m); break;
+        case "mediaSession": onMediaSession(m); break;
       }
     };
   }

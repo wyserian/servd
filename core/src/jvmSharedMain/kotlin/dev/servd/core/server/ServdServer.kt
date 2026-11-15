@@ -9,6 +9,16 @@ import dev.servd.core.chat.ChatSend
 import dev.servd.core.chat.ClearChat
 import dev.servd.core.chat.FileMeta
 import dev.servd.core.chat.Hello
+import dev.servd.core.chat.LiveLeave
+import dev.servd.core.chat.LiveStart
+import dev.servd.core.chat.LiveStop
+import dev.servd.core.chat.LiveWatch
+import dev.servd.core.chat.MediaPlay
+import dev.servd.core.chat.MediaPlayUrl
+import dev.servd.core.files.MediaLink
+import dev.servd.core.chat.MediaState
+import dev.servd.core.chat.MediaStop
+import dev.servd.core.chat.SignalSend
 import dev.servd.core.files.DropLimits
 import dev.servd.core.files.FileStore
 import dev.servd.core.files.MediaTypes
@@ -224,6 +234,24 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                                 is Hello -> chatHub.onHello(id, msg.name)
                                 is ChatSend -> chatHub.onChat(id, msg.text)
                                 is ClearChat -> chatHub.onClearChat(id)
+                                // Only the host goes live; other devices can only watch.
+                                is LiveStart -> if (isLoopback(address)) chatHub.onLiveStart(id, msg.kind)
+                                is LiveStop -> chatHub.onLiveStop(id)
+                                is LiveWatch -> chatHub.onLiveWatch(id, msg.id)
+                                is LiveLeave -> chatHub.onLiveLeave(id, msg.id)
+                                is SignalSend -> chatHub.onSignal(id, msg)
+                                // Playing a shared video/audio file for everyone: host only, too.
+                                is MediaPlay -> if (isLoopback(address)) {
+                                    fileStore.get(msg.fileId)?.first?.let { meta ->
+                                        val kind = MediaTypes.forFile(meta.name, meta.contentType).substringBefore('/')
+                                        if (kind == "video" || kind == "audio") chatHub.onMediaPlay(id, meta.id, "/files/${meta.id}", meta.name, kind)
+                                    }
+                                }
+                                is MediaPlayUrl -> if (isLoopback(address)) {
+                                    MediaLink.parse(msg.url)?.let { chatHub.onMediaPlay(id, null, it.src, it.name, it.kind) }
+                                }
+                                is MediaState -> chatHub.onMediaState(id, msg.playing, msg.position, msg.sync)
+                                is MediaStop -> chatHub.onMediaStop(id)
                                 null -> {}
                             }
                         }

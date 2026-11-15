@@ -31,6 +31,10 @@ class ChatHub(private val serverName: String) {
     private val conns = ConcurrentHashMap<String, Conn>()
     private val registry = PeerRegistry()
     private val registryLock = Mutex()
+    private val live = LiveRegistry(newId = { UUID.randomUUID().toString() })
+    private val liveLock = Mutex()
+    private var playback: Playback? = null // what the host is playing for everyone
+    private val playbackLock = Mutex()
     private val json = Json {
         classDiscriminator = "type"
         encodeDefaults = true
@@ -53,6 +57,8 @@ class ChatHub(private val serverName: String) {
         registryLock.withLock { registry.put(peer) }
         broadcast(PresenceEvent("join", peer))
         broadcastRoster()
+        sendTo(id, liveList()) // who is already live
+        sendTo(id, mediaSession()) // and what is playing, so a late joiner catches up
     }
 
     suspend fun onChat(id: String, text: String) {
@@ -64,6 +70,10 @@ class ChatHub(private val serverName: String) {
 
     suspend fun onDisconnect(id: String) {
         conns.remove(id)
+        val gone = liveLock.withLock { live.removePeer(id) }
+        for ((streamId, ownerId) in gone.leftFrom) sendTo(ownerId, LiveViewer(streamId, id, joined = false))
+        if (gone.changed) broadcastLive()
+        endPlaybackIf { it.ownerId == id } // the host who started it left
         val peer = registryLock.withLock { registry.remove(id) } ?: return
         broadcast(PresenceEvent("leave", peer))
         broadcastRoster()
@@ -92,15 +102,90 @@ class ChatHub(private val serverName: String) {
 
     suspend fun announceFileRemoved(id: String) {
         broadcast(FileRemoved(id))
+        endPlaybackIf { it.fileId == id }
     }
 
     suspend fun announceFilesRemoved(ids: List<String>) {
         if (ids.isNotEmpty()) broadcast(FilesRemoved(ids))
+        endPlaybackIf { it.fileId in ids }
     }
 
     suspend fun announceFilesCleared(byName: String) {
         broadcast(FilesCleared(byName))
+        endPlaybackIf { it.fileId != null } // links aren't shared files
     }
+
+    // ---- play a shared file for everyone (the caller checks the host and the file)
+
+    suspend fun onMediaPlay(id: String, fileId: String?, src: String, name: String, kind: String) {
+        if (conns[id]?.name == null) return
+        playbackLock.withLock { playback = Playback(fileId, src, name, kind, id, now()) }
+        broadcast(mediaSession())
+    }
+
+    /** Only the device that started playback steers it. */
+    suspend fun onMediaState(id: String, playing: Boolean, position: Double, sync: Boolean) {
+        val changed = playbackLock.withLock {
+            val p = playback?.takeIf { it.ownerId == id && position.isFinite() } ?: return@withLock false
+            playback = p.update(playing, position, sync, now())
+            true
+        }
+        if (changed) broadcast(mediaSession())
+    }
+
+    suspend fun onMediaStop(id: String) = endPlaybackIf { it.ownerId == id }
+
+    private suspend fun endPlaybackIf(predicate: (Playback) -> Boolean) {
+        val ended = playbackLock.withLock { playback?.takeIf(predicate)?.also { playback = null } != null }
+        if (ended) broadcast(MediaSession(null))
+    }
+
+    private suspend fun mediaSession() = MediaSession(playbackLock.withLock { playback?.info(now()) })
+
+    private fun now() = System.currentTimeMillis()
+
+    // ---- live streams: the hub tracks who is live and relays WebRTC setup; media is peer to peer
+
+    suspend fun onLiveStart(id: String, kind: String) {
+        if (conns[id]?.name == null) return // must have said hello first
+        if (liveLock.withLock { live.start(id, kind) }) broadcastLive()
+    }
+
+    suspend fun onLiveStop(id: String) {
+        if (liveLock.withLock { live.stop(id) }) broadcastLive() // viewers drop it from the list
+    }
+
+    suspend fun onLiveWatch(id: String, streamId: String) {
+        when (val r = liveLock.withLock { live.watch(streamId, id) }) {
+            is LiveRegistry.Watch.Ok -> {
+                sendTo(r.ownerId, LiveViewer(streamId, id, joined = true))
+                broadcastLive()
+            }
+            LiveRegistry.Watch.Full -> sendTo(id, LiveFull(streamId))
+            LiveRegistry.Watch.Invalid -> {}
+        }
+    }
+
+    suspend fun onLiveLeave(id: String, streamId: String) {
+        val ownerId = liveLock.withLock { live.leave(streamId, id) } ?: return
+        sendTo(ownerId, LiveViewer(streamId, id, joined = false))
+        broadcastLive()
+    }
+
+    /** Relay a setup message, only between a stream's owner and its viewers, and only small ones. */
+    suspend fun onSignal(from: String, msg: SignalSend) {
+        if (msg.data.toString().length > MAX_SIGNAL_CHARS) return
+        if (liveLock.withLock { live.canRelay(msg.stream, from, msg.to) }) {
+            sendTo(msg.to, SignalEvent(from, msg.stream, msg.data))
+        }
+    }
+
+    private suspend fun liveList(): LiveList {
+        val names = conns.mapValues { it.value.name }
+        return liveLock.withLock { LiveList(live.snapshot { names[it] }, live.maxViewers) }
+    }
+
+    private suspend fun broadcastLive() = broadcast(liveList())
 
     /** Parse an inbound client frame; null if it isn't a valid message. */
     fun parseClient(text: String): ClientMessage? =
@@ -127,5 +212,10 @@ class ChatHub(private val serverName: String) {
         } catch (_: Exception) {
             // Session died mid-broadcast; disconnect handling removes it.
         }
+    }
+
+    private companion object {
+        /** SDP offers/answers are a few KB; anything far bigger isn't WebRTC setup. */
+        const val MAX_SIGNAL_CHARS = 64_000
     }
 }

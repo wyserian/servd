@@ -45,6 +45,11 @@ configure the host appear only on the host itself.
 - **Storage limits:** the hub never fills its own disk. The host can add a quota and auto-clear
   shared files after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live list of who's connected.
+- **Live streams:** the host goes live with their camera, microphone or (in desktop browsers) screen,
+  and up to 10 devices watch. Media goes peer to peer over the LAN with WebRTC, so the hub isn't
+  loaded.
+- **Watch together:** the host plays a shared video or audio file for everyone. With sync on, the
+  host's play, pause and seek apply on every device.
 - **Previews:** shared files preview inline in chat: images (with a full-size viewer), video and
   audio players, and the first lines of text and code files. Image files also get thumbnails in the
   file list.
@@ -126,6 +131,7 @@ grant all-files access. The folder picker then starts at Internal storage.
 |---|---|---|
 | **drop files** | everyone | shared files and folders pushed to every device |
 | **chat** | everyone | real-time chat |
+| **stream** | everyone | watch the host's live stream or the file it's playing for everyone; the host can go live (camera / microphone / screen) or play a file |
 | **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
 | **serve site** | host only | re-serve a running web app to the LAN |
 | **ftp** / **ssh** | host only | turn the server on or off; shows the port, password and connect command |
@@ -149,6 +155,42 @@ turn it off; you can switch folders anytime. Paths that try to leave the folder 
 
 The app is served at the root, so SPA routes and absolute asset paths keep working. servd adds TLS,
 so even an HTTP-only or localhost-only app is reachable and encrypted across the LAN.
+
+**Live streams:**
+1. On the host, open the **stream** tab, pick **camera**, **microphone** or **screen**, then click
+   **go live**. The browser asks for permission first. Only the host can go live; the hub refuses it
+   from other devices.
+2. Everyone else sees the stream in the tab and in chat, and clicks **watch**. On large screens,
+   the list of what's live sits on the right.
+
+Things to know:
+- **Media path:** it flows directly between the two devices (WebRTC, about 0.5 s delay). The hub
+  only relays the connection setup, so a phone hub isn't loaded.
+- **Viewers:** up to 10 per stream. The streamer uploads one copy per viewer, with video capped at
+  2.5 Mbps.
+- **Screen sharing:** needs a desktop browser. Phones can stream their camera and microphone.
+- **Networks:** Wi-Fi with *client isolation* (some hotel or office networks) blocks
+  device-to-device traffic, so streams won't connect there. Your own hotspot or home Wi-Fi is fine.
+
+**Watch together (play a file for everyone):**
+1. **Start (host):** in the **stream** tab, pick a shared video or audio file and click **play**.
+   Alternatively, choose a file from your device, which also shares it, or press **▶** on a
+   video/audio row in drop files.
+2. **Join (everyone else):** the player appears with a chat note. With sync on, they tap
+   **join playback** once, because browsers need a tap before playing sound.
+
+How sync works:
+- **On (default):** the host's play, pause and seek apply on every device, within about half a
+  second. A device that joins midway lands at the current spot.
+- **Going your own way:** a viewer who pauses or seeks on their own stops following until they
+  press **resync**.
+- **Off:** everyone plays at their own pace.
+
+Limits:
+- **Viewers:** each device streams the file from the hub, so there's no 10-viewer cap.
+- **Formats:** whatever the browser plays (MP4/H.264, WebM, MP3, M4A, OGG, WAV, FLAC). MKV and AVI
+  often don't play.
+- **Ending:** playback ends when the host stops it, leaves, or the file is deleted.
 
 ### Join PIN & Storage Limits
 
@@ -231,6 +273,9 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
   (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
 - **Browse files** is off by default and set up only from the host. Clients can't go above the
   chosen folder, and uploads are refused unless the host allows them.
+- **Live streams** use the browser's WebRTC encryption (DTLS-SRTP) between the two devices. The hub
+  only relays setup messages, and only between a stream's owner and its current viewers, so the
+  join PIN covers who can watch.
 - **Serve site** is off by default and set up only from the host. While it's on, the target app is
   open to the LAN on its own port, behind the join PIN if one is set. Stopping it closes that port.
 - **Encryption** covers the network hop, checked by fingerprint. It is **not end to end**: the
@@ -264,6 +309,8 @@ servd/
   - `Service` (`commonMain`) is a startable/stoppable server with an id, port and state.
     `ServiceManager` starts, stops and toggles services, one call at a time.
   - Implementations (`jvmSharedMain`): `HttpService` (always on), `SshService` and `FtpService`.
+  - `LiveRegistry` (`commonMain`) tracks live streams and their viewers, caps viewers, and decides
+    which WebRTC setup messages may be relayed.
   - `ChatHub` (`jvmSharedMain`) tracks who's connected and broadcasts chat, join/leave and roster
     events.
   - `FileStore` + `DropLimits` (`jvmSharedMain`) store shared files and enforce the free-space
@@ -280,6 +327,8 @@ servd/
   | Join PIN | `GET /auth` state · `POST /auth` check PIN, set session cookie |
   | Host status | `GET /status`: host info + fingerprint |
   | Chat | WebSocket `/ws`: announce a name, then chat |
+  | Live streams | over `/ws`: `liveStart` / `liveStop` / `liveWatch` / `liveLeave`, and `signal` messages relayed between a streamer and its viewers (`LiveRegistry`) |
+  | Watch together | over `/ws`: `mediaPlay` / `mediaState` / `mediaStop` from the host (`Playback`); everyone gets `mediaSession` and streams `GET /files/{id}` |
   | Drop files | `POST /files` upload (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
   | Serve site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
