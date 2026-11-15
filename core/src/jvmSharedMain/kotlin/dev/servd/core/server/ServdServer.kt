@@ -29,7 +29,6 @@ import dev.servd.core.files.MediaTypes
 import io.ktor.server.http.content.LocalFileContent
 import io.ktor.server.plugins.partialcontent.PartialContent
 import dev.servd.core.qr.Qr
-import dev.servd.core.service.HttpService
 import dev.servd.core.service.Service
 import dev.servd.core.service.ServiceManager
 import dev.servd.core.tls.TlsKeyStore
@@ -75,6 +74,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedOutputStream
@@ -82,12 +82,9 @@ import java.io.File
 import java.io.OutputStream
 
 /**
- * servd's single HTTPS server. Phase 1 serves the dashboard shell and a `/status` endpoint;
- * later phases add WebSocket chat, presence, and file sharing on the same server.
- *
- * The routing/module and TLS wiring here are engine-agnostic; the concrete Ktor engine is
- * passed in by each platform - Netty on desktop (Ktor CIO does not support server HTTPS).
- * Lives in `jvmSharedMain` so the same server logic runs on desktop now and Android later.
+ * servd's single HTTPS server: the dashboard, chat and presence over `/ws`, shared files, browse,
+ * status and the host-only admin API. Engine-agnostic; each platform passes Netty in (Ktor CIO
+ * can't serve HTTPS). Lives in `jvmSharedMain`, so desktop and Android run the same server.
  */
 class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.Configuration>(
     private val engineFactory: ApplicationEngineFactory<TEngine, TConfiguration>,
@@ -99,8 +96,8 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     private val tls: TlsKeyStore,
     /** Directory where shared files are stored. */
     filesDir: File,
-    /** Platform services (e.g. SSH/FTP on desktop) added alongside the always-on HTTP one. */
-    extraServices: List<Service> = emptyList(),
+    /** The optional services (SSH/SFTP, FTPS), toggled from the admin panel. */
+    services: List<Service> = emptyList(),
     /** Machine host name, shown in the host card. */
     private val hostName: String = "servd",
     /** Bound network interface name (e.g. "wlan0"), shown in the host card. */
@@ -144,7 +141,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     private val webProxy = WebProxy(engineFactory, bindHost, advertisedHost, tls, allows = { it.mayUseHub() }, hubUrl = url).also { p ->
         if (proxyTarget != null) runCatching { p.enable(proxyTarget, proxyPort) }
     }
-    private val serviceManager = ServiceManager(listOf(HttpService(port)) + extraServices)
+    private val serviceManager = ServiceManager(services)
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
     // The dashboard is one resource; read it by name (works on desktop and Android).
@@ -278,23 +275,12 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
             // Machine-readable status - includes the cert fingerprint for verification.
             get("/status") {
-                val ifaceJson = interfaceName?.let { "\"$it\"" } ?: "null"
-                val json = buildString {
-                    append('{')
-                    append("\"name\":\"").append(Servd.NAME).append("\",")
-                    append("\"version\":\"").append(Servd.VERSION).append("\",")
-                    append("\"address\":\"").append(advertisedHost).append("\",")
-                    append("\"port\":").append(port).append(',')
-                    append("\"hostName\":\"").append(hostName).append("\",")
-                    append("\"interfaceName\":").append(ifaceJson).append(',')
-                    append("\"localName\":").append(localName?.let { "\"$it\"" } ?: "null").append(',')
-                    append("\"uptimeMs\":").append(System.currentTimeMillis() - startedAt).append(',')
-                    append("\"connected\":").append(chatHub.connectionCount()).append(',')
-                    append("\"tls\":\"self-signed\",")
-                    append("\"fingerprintSha256\":\"").append(tls.fingerprintSha256).append('"')
-                    append('}')
-                }
-                call.respondText(json, ContentType.Application.Json)
+                val status = Status(
+                    Servd.NAME, Servd.VERSION, advertisedHost, port, hostName, interfaceName, localName,
+                    uptimeMs = System.currentTimeMillis() - startedAt, connected = chatHub.connectionCount(),
+                    fingerprintSha256 = tls.fingerprintSha256,
+                )
+                call.respondText(json.encodeToString(status), ContentType.Application.Json)
             }
             // QR code (SVG) encoding the shareable hub URL, so a phone can scan to join.
             get("/qr") {
@@ -575,8 +561,26 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
         chatHub.announceFilesRemoved(fileStore.expire().map { it.id })
     }
 
-    private fun pinConfig(): String =
-        """{"enabled":${joinPin.enabled},"pin":${joinPin.current?.let { "\"$it\"" } ?: "null"}}"""
+    private fun pinConfig(): String = json.encodeToString(PinConfig(joinPin.enabled, joinPin.current))
+
+    /** `/status`: who this hub is, and the cert fingerprint to verify it by. */
+    @Serializable
+    private data class Status(
+        val name: String,
+        val version: String,
+        val address: String,
+        val port: Int,
+        val hostName: String,
+        val interfaceName: String?,
+        val localName: String?,
+        val uptimeMs: Long,
+        val connected: Int,
+        val fingerprintSha256: String,
+        val tls: String = "self-signed",
+    )
+
+    @Serializable
+    private data class PinConfig(val enabled: Boolean, val pin: String?)
 }
 
 /** Reachable without a session while a join PIN is set: the page (it shows the PIN screen) and the check. */

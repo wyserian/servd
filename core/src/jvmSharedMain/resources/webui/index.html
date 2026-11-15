@@ -44,6 +44,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; } /* beats any component's own display rule */
   body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; height: 100dvh; overflow: hidden; }
   /* full-viewport app shell: fills the screen, no centering, panels scroll internally */
   .app { height: 100%; display: flex; flex-direction: column; padding: 7px; gap: 7px; }
@@ -114,7 +115,6 @@
   #dlAllBtn { margin-right: 6px; }
   /* buttons: quiet secondary by default; one filled primary per section; red only for destructive */
   .mini-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--ink); background: var(--surface-2); border: 0; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background .15s, color .15s, filter .15s; }
-  .mini-btn[hidden] { display: none; } /* the display rule above would otherwise override hidden */
   .mini-btn:hover:not(:disabled) { background: var(--border); }
   .mini-btn:disabled { opacity: .45; cursor: not-allowed; }
   .mini-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -190,7 +190,6 @@
   .media-cap svg { color: var(--muted); flex-shrink: 0; }
   .media-cap:hover svg { color: var(--accent-ink); }
   .viewer { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: rgba(5,10,12,.9); }
-  .viewer[hidden] { display: none; }
   .viewer img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 8px; }
   .viewer-bar { display: flex; align-items: center; gap: 8px; max-width: 100%; color: #E6EDEF; font-family: var(--mono); font-size: 12.5px; }
   .viewer-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px; }
@@ -266,10 +265,9 @@
   .px-label { font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .px-field input { background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12px; width: 100%; }
   #pxStatus a { color: var(--accent); word-break: break-all; }
-  .br-pick-actions, .br-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .br-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   /* ---------- settings drawer (host only): join PIN, storage, about this host ---------- */
-  .icon-btn[hidden] { display: none; }
   #gear[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-soft); }
   .drawer-backdrop { position: fixed; inset: 0; z-index: 64; background: rgba(5,10,12,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
   .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
@@ -291,22 +289,18 @@
   @media (min-width: 1100px) {
     .stream-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; max-width: 1200px; }
   }
-  .set-sec[hidden], #liveIdle[hidden] { display: none; }
   .sync-opt { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
   #playPick, #playUrl { flex: 1; min-width: 0; }
   #npMedia iframe.stream-video { display: block; aspect-ratio: 16 / 9; height: auto; border: 0; }
   #npMedia audio { width: 100%; }
   .np-actions { justify-content: flex-start; gap: 8px; }
   .stream-video { width: 100%; max-height: 60vh; background: #000; border-radius: var(--r-sm); }
-  .stream-video[hidden] { display: none; }
   .audio-only { padding: 26px 12px; text-align: center; border-radius: var(--r-sm); background: var(--surface); font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
-  .audio-only[hidden] { display: none; }
   .live-badge { color: var(--error); text-transform: uppercase; }
   .live-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
   .live-row .lr-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .live-row .lr-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
   .sys .mini-btn { margin-left: 8px; }
-  .host-settings[hidden] { display: none; }
   .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .pref-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .pref-title { font-size: 13px; color: var(--ink); }
@@ -335,7 +329,6 @@
     background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
   select.sto-input option { background-color: var(--surface); color: var(--ink); }
   .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
-  .lock-screen[hidden] { display: none; }
   .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
   .lock-label { font-size: 14px; color: var(--ink); }
   .pin-input { font-family: var(--mono); font-size: 24px; letter-spacing: .4em; text-align: center; padding: 10px; background: var(--surface-2); border-radius: 8px; color: var(--ink); width: 100%; }
@@ -347,7 +340,6 @@
   .fingerprint { display: flex; align-items: center; gap: 8px; }
   .fingerprint .v { font-size: 11.5px; color: var(--muted); }
   .qr { width: 140px; height: 140px; background: #fff; border-radius: 8px; padding: 8px; }
-  .qr[hidden] { display: none; }
   .dev-qr { margin-top: auto; padding: 12px 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--surface-2); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: background .15s, color .15s; }
   .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
@@ -741,15 +733,9 @@
 
 <script>
   const COLORS = ["#0E9E88","#3B6FE0","#C0603A","#7A57C2","#C4396F","#B8860B","#0E9E88","#D14A43"];
-  const LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
   const FILEICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>';
   const DLICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0-4-4m4 4 4-4"/><path d="M5 20h14"/></svg>';
   const XICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-  const SVCICON = {
-    http: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg>',
-    ssh:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>',
-    ftp:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
-  };
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
@@ -849,11 +835,15 @@
   // ---- chat ----
   const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   function addChat(fromId, fromName, text, ts){
-    const stick=atBottom(); const el=document.createElement("div"); el.className="msg"+(fromId===selfId?" me":"");
-    const who = fromId===selfId ? "you" : esc(fromName);
-    const col = fromId===selfId ? "var(--accent-ink)" : colorFor(fromName);
-    el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(ts)+'</span></div><div class="bubble">'+esc(text)+'</div>';
-    log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
+    const stick=atBottom();
+    log.appendChild(newMsg(fromId===selfId, fromName, ts, '<div class="bubble">'+esc(text)+'</div>')); if(stick) log.scrollTop=log.scrollHeight;
+  }
+  // A chat message from [name] ("you" if [mine]), headed with who and when, followed by [body] (HTML).
+  function newMsg(mine, name, ts, body){
+    const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
+    el.innerHTML='<div class="msg-head"><span class="msg-who" style="color:'+(mine?"var(--accent-ink)":colorFor(name))+'">'+(mine?"you":esc(name))+'</span>'+
+      '<span class="msg-time">'+time(ts)+'</span></div>'+body;
+    return el;
   }
   function addSys(t){ const stick=atBottom(); const el=document.createElement("div"); el.className="sys"; el.textContent="- "+t+" -"; log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight; }
   // ---- previews: images, video, audio and text inline in chat; image thumbnails in drop files ----
@@ -880,10 +870,7 @@
   function isMine(f){ return f.fromId ? f.fromId===myPeerId : f.fromName===userName; }
   function imgThumb(f){ return '<button type="button" class="media-img" data-open="'+esc(f.id)+'" title="View"><img loading="lazy" alt="'+esc(f.name)+'" src="'+fileUrl(f)+'"></button>'; }
   function addFileMsg(f){
-    const stick=atBottom(); const mine=isMine(f);
-    const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
-    const who = mine ? "you" : esc(f.fromName);
-    const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
+    const stick=atBottom();
     const url=fileUrl(f), kind=previewKind(f);
     const cap='<a class="media-cap" href="'+url+'" download="'+esc(f.name)+'" title="Download"><span class="media-name">'+esc(f.name)+'</span><span class="media-size">'+fmtSize(f.size)+'</span>'+DLICON+'</a>';
     let body;
@@ -892,7 +879,7 @@
     else if(kind==="audio") body='<div class="bubble media audio"><audio controls preload="none" src="'+url+'"></audio>'+cap+'</div>';
     else if(kind==="text" && f.size<=TEXT_MAX) body='<div class="bubble media"><pre class="text-peek">loading&hellip;</pre>'+cap+'</div>';
     else body='<a class="bubble file-msg" href="'+url+'" download="'+esc(f.name)+'"><span class="fi">'+FILEICON+'</span>shared <b>'+esc(f.name)+'</b> &middot; '+fmtSize(f.size)+'</a>';
-    el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(f.ts)+'</span></div>'+body;
+    const el=newMsg(isMine(f), f.fromName, f.ts, body);
     log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
     wireMedia(el, f, stick);
   }
@@ -929,11 +916,8 @@
     let m=folderMsgs.get(f.batch);
     if(!m){
       const stick=atBottom(); const mine=isMine(f);
-      const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
-      const who = mine ? "you" : esc(f.fromName);
-      const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
-      el.innerHTML = '<div class="msg-head"><span class="msg-who" style="color:'+col+'">'+who+'</span><span class="msg-time">'+time(f.ts)+'</span></div>'+
-        '<a class="bubble file-msg" href="/files/zip?batch='+encodeURIComponent(f.batch)+'" download><span class="fi">'+FICON+'</span>shared <b>'+esc(topName(f))+'/</b> &middot; <span class="fcount"></span></a>';
+      const el=newMsg(mine, f.fromName, f.ts,
+        '<a class="bubble file-msg" href="/files/zip?batch='+encodeURIComponent(f.batch)+'" download><span class="fi">'+FICON+'</span>shared <b>'+esc(topName(f))+'/</b> &middot; <span class="fcount"></span></a>');
       log.appendChild(el); if(stick) log.scrollTop=log.scrollHeight;
       m={el,count:0,size:0}; folderMsgs.set(f.batch,m);
       if(!mine) noteActivity(f.fromName, "shared the folder "+topName(f)+"/", "files");
@@ -1222,16 +1206,15 @@
   $("attach").addEventListener("click",()=>fileInput.click());
 
   // ---- admin (host only) ----
-  // SSH and FTP each have their own tab; http is always-on and has no UI.
+  // SSH and FTP each have their own tab.
   let hubAddr="", lastSvc=[];
   function renderServices(list){
     lastSvc = list;
     for(const s of list){
-      if(s.id!=="ftp" && s.id!=="ssh") continue;
       const up = s.state==="Running";
       const dot=$(s.id+"Dot"); if(dot) dot.classList.toggle("on", up);
       const st=$(s.id+"Status"); if(st) st.textContent = up ? "Running" : "Off";
-      const cb=$(s.id+"Toggle"); if(cb){ cb.checked=up; cb.disabled=!s.toggleable; }
+      const cb=$(s.id+"Toggle"); if(cb){ cb.checked=up; cb.disabled=false; } // disabled while a toggle is in flight
     }
     renderConnect();
   }
@@ -1240,8 +1223,7 @@
   function renderConnect(){
     const addr = hubAddr || "host";
     for(const s of lastSvc){
-      if(s.id!=="ftp" && s.id!=="ssh") continue;
-      const pass = (s.detail && s.detail.match(/password:\s*(\S+)/) || [])[1] || "";
+      const pass = s.password || "";
       const cmd = s.id==="ssh" ? ("sftp -P "+s.port+" servd@"+addr) : ("ftps://servd@"+addr+":"+s.port);
       const c=$(s.id+"Cmd"); if(c) c.textContent = cmd;
       const p=$(s.id+"Pass"); if(p) p.textContent = pass || "-";

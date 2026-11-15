@@ -18,8 +18,6 @@ import org.apache.ftpserver.usermanager.impl.BaseUser
 import org.apache.ftpserver.usermanager.impl.ConcurrentLoginPermission
 import org.apache.ftpserver.usermanager.impl.WritePermission
 import java.io.File
-import java.security.KeyStore
-import java.security.PrivateKey
 
 /**
  * FTP service (Apache FtpServer) speaking **explicit FTPS** (AUTH TLS) using servd's own
@@ -31,13 +29,9 @@ class FtpService(
     private val filesDir: File,
     private val tls: TlsKeyStore,
     private val username: String,
-    private val password: String,
+    override val password: String,
 ) : Service {
     override val id: String = "ftp"
-    override val label: String = "FTP / FTPS (files)"
-    override val toggleable: Boolean = true
-    override val detail: String
-        get() = "ftp (explicit TLS) $username@host:$port   password: $password   (jailed to shared files)"
 
     @Volatile private var server: FtpServer? = null
     @Volatile private var current: ServiceState = ServiceState.Stopped
@@ -50,24 +44,14 @@ class FtpService(
             filesDir.mkdirs()
             val factory = FtpServerFactory()
 
-            // FtpServer's SunX509 key-manager init is picky about the PKCS12 Ktor writes, so
-            // rebuild a clean PKCS12 keystore (store password == key password) from the same
-            // private key + cert chain, kept outside the shared files directory.
-            val ftpPw = "servd"
-            val ftpKeyStoreFile = File(filesDir.parentFile ?: filesDir, "ftp-keystore.p12")
-            val privateKey = tls.keyStore.getKey(tls.alias, tls.privateKeyPasswordChars()) as PrivateKey
-            val chain = tls.keyStore.getCertificateChain(tls.alias)
-            KeyStore.getInstance("PKCS12").apply {
-                load(null, ftpPw.toCharArray())
-                setKeyEntry(tls.alias, privateKey, ftpPw.toCharArray(), chain)
-                ftpKeyStoreFile.outputStream().use { store(it, ftpPw.toCharArray()) }
-            }
-
+            // servd's own keystore: a plain PKCS12 with one password for store and key, as
+            // FtpServer's key manager needs.
             val ssl = SslConfigurationFactory().apply {
-                keystoreFile = ftpKeyStoreFile
-                keystorePassword = ftpPw
-                keyPassword = ftpPw
+                keystoreFile = tls.file
+                keystorePassword = tls.keyStorePassword
+                keyPassword = tls.privateKeyPassword
                 keystoreType = "PKCS12"
+                keyAlias = tls.alias
             }
             val sslConfig = ssl.createSslConfiguration()
             // The data channel needs TLS too (clients send PROT P); reuse the same config.

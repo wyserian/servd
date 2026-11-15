@@ -97,8 +97,9 @@ class JoinPinTest {
         val pin = JoinPin(null) { clock }.apply { set("4821") }
         var last: JoinPin.Attempt? = null
         repeat(40) {
-            last = pin.attempt("10.0.0.5", "0000")
-            if (last is JoinPin.Attempt.Locked) clock += (last as JoinPin.Attempt.Locked).retryAfterMs
+            val r = pin.attempt("10.0.0.5", "0000")
+            if (r is JoinPin.Attempt.Locked) clock += r.retryAfterMs
+            last = r
         }
         assertEquals(JoinPin.Attempt.Locked(JoinPin.MAX_LOCK_MS), last)
     }

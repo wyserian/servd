@@ -1,6 +1,7 @@
 package dev.servd.core.proxy
 
 import dev.servd.core.tls.TlsKeyStore
+import dev.servd.core.tls.TrustAllCerts
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.websocket.webSocket as clientWebSocket
@@ -94,7 +95,7 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
             followRedirects = false // relay 3xx to the browser (with Location rewritten)
             expectSuccess = false   // 4xx/5xx are normal responses to forward, not errors
             engine {
-                https { trustManager = TrustAll }
+                https { trustManager = TrustAllCerts }
             }
         }
     }
@@ -283,12 +284,6 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     }
 
     private companion object {
-        val TrustAll = object : javax.net.ssl.X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
-        }
-
         // Connection-level headers that must not be forwarded (RFC 7230), plus length/encoding
         // the engine recomputes and Host (set from the target URL).
         val REQUEST_STRIP = setOf(

@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-// Release signing (Phase 9): read credentials from an untracked keystore.properties so no secret
+// Release signing: read credentials from an untracked keystore.properties so no secret
 // ever lands in the repo (see README for how to generate one). Without it, assembleRelease still
 // builds, but produces an unsigned APK you must sign yourself.
 val keystorePropsFile = rootProject.file("androidApp/keystore.properties")

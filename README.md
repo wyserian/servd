@@ -315,9 +315,9 @@ servd/
   parameter. Both platforms pass **Netty**, because Ktor's CIO engine can't serve HTTPS. The
   keystore is **PKCS12**, because Android has no JKS provider.
 - **Key abstractions:**
-  - `Service` (`commonMain`) is a startable/stoppable server with an id, port and state.
-    `ServiceManager` starts, stops and toggles services, one call at a time.
-  - Implementations (`jvmSharedMain`): `HttpService` (always on), `SshService` and `FtpService`.
+  - `Service` (`commonMain`) is an optional server (SSH/SFTP, FTPS) with an id, port, state and
+    password. `ServiceManager` starts and stops them, one call at a time.
+  - Implementations (`jvmSharedMain`): `SshService` and `FtpService`.
   - `LiveRegistry` (`commonMain`) tracks live streams and their viewers, caps viewers, and decides
     which WebRTC setup messages may be relayed.
   - `ChatHub` (`jvmSharedMain`) tracks who's connected and broadcasts chat, join/leave and roster

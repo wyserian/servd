@@ -21,13 +21,9 @@ class SshService(
     private val filesDir: File,
     private val hostKeyFile: File,
     private val username: String,
-    private val password: String,
+    override val password: String,
 ) : Service {
     override val id: String = "ssh"
-    override val label: String = "SSH / SFTP (files)"
-    override val toggleable: Boolean = true
-    override val detail: String
-        get() = "sftp -P $port $username@host   password: $password   (jailed to shared files)"
 
     @Volatile private var server: SshServer? = null
     @Volatile private var current: ServiceState = ServiceState.Stopped

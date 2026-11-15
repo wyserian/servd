@@ -2,20 +2,12 @@ package dev.servd.android
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import dev.servd.core.qr.Qr
 
-/** Renders text as a QR-code [Bitmap] for the control screen (core's Qr emits SVG, which an
- *  ImageView cannot draw). Same encoder, rasterized here so a phone can be scanned to join. */
+/** Draws core's QR grid as a [Bitmap] for the control screen (an ImageView can't draw core's SVG). */
 object QrBitmap {
     fun of(text: String, sizePx: Int): Bitmap {
-        val hints = mapOf<EncodeHintType, Any>(
-            EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-            EncodeHintType.MARGIN to 2,
-        )
-        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
+        val matrix = Qr.matrix(text, sizePx)
         val w = matrix.width
         val h = matrix.height
         val pixels = IntArray(w * h)

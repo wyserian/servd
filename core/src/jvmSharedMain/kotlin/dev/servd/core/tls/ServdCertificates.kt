@@ -6,6 +6,7 @@ import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
+import javax.net.ssl.X509TrustManager
 
 /**
  * A loaded/generated self-signed keystore plus its verifiable fingerprint. Passwords are kept
@@ -23,6 +24,16 @@ class TlsKeyStore(
 ) {
     fun keyStorePasswordChars(): CharArray = keyStorePassword.toCharArray()
     fun privateKeyPasswordChars(): CharArray = privateKeyPassword.toCharArray()
+}
+
+/**
+ * Accepts any certificate. Only for connections to the host's own servers: the serve-site
+ * target, and the check for a servd already running on this machine.
+ */
+object TrustAllCerts : X509TrustManager {
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
 }
 
 /**

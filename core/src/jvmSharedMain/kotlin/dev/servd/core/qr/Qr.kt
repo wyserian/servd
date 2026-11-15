@@ -2,21 +2,26 @@ package dev.servd.core.qr
 
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
+import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
-/** Renders text as a QR code, as a self-contained SVG string (no rasterization, works offline). */
+/** QR codes for servd's links: one encoder setup, drawn as SVG here and as a bitmap on Android. */
 object Qr {
-    fun svg(text: String, quietZone: Int = 2): String {
+    /** The QR grid for [text], scaled to about [size] px (0 = one pixel per module), with a 2-module quiet zone. */
+    fun matrix(text: String, size: Int = 0): BitMatrix {
         val hints = mapOf<EncodeHintType, Any>(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-            EncodeHintType.MARGIN to quietZone,
+            EncodeHintType.MARGIN to 2,
         )
-        // width/height 0 -> the writer uses one pixel per module (the raw grid).
-        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, hints)
+        return QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints)
+    }
+
+    /** [text] as a self-contained SVG string (no rasterization, works offline). */
+    fun svg(text: String): String {
+        val matrix = matrix(text)
         val w = matrix.width
         val h = matrix.height
-
         val path = StringBuilder()
         for (y in 0 until h) {
             for (x in 0 until w) {

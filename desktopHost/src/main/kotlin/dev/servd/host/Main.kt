@@ -19,11 +19,10 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
-import java.security.cert.X509Certificate
+import dev.servd.core.tls.TrustAllCerts
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
-import javax.net.ssl.X509TrustManager
 import kotlin.system.exitProcess
 
 /**
@@ -268,12 +267,7 @@ private fun portInUse(port: Int, noOpen: Boolean, adminToken: String): Nothing {
 /** The version of the servd answering on loopback [port], or null if it isn't servd. */
 private fun runningServdVersion(port: Int): String? = runCatching {
     // Our own self-signed cert on our own machine: skip verification for this one probe.
-    val trustAll = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-    }
-    val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustAll), null) }
+    val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(TrustAllCerts), null) }
     val conn = URI("https://127.0.0.1:$port/status").toURL().openConnection() as HttpsURLConnection
     conn.sslSocketFactory = ssl.socketFactory
     conn.hostnameVerifier = HostnameVerifier { _, _ -> true }

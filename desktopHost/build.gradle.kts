@@ -35,7 +35,7 @@ application {
 }
 
 // ---------------------------------------------------------------------------
-// Packaging (Phase 9): bundle servd with its own JRE via jpackage, so an end
+// Packaging: bundle servd with its own JRE via jpackage, so an end
 // user needs nothing else installed. `jpackageImage` builds a self-contained
 // app folder (no external tooling required); `jpackageInstaller` builds a
 // native installer for the current OS (needs WiX on Windows, and produces

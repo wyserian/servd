@@ -5,14 +5,13 @@ import java.io.File
 import java.io.InputStream
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * Serves a host-chosen directory (the "browse root") to LAN clients: list, download, and - when
  * writable - upload. Every client path is relative to the root and canonically jailed inside it,
- * so a crafted path can never escape. Off until a root is set by the host (loopback admin only).
- *
- * Backed by java.io.File - covers desktop and Android all-files-access. A SAF-backed source for
- * the Android folder picker is a later phase.
+ * so a crafted path can never escape. Off until the host sets a root from the admin panel.
+ * Backed by java.io.File: desktop, and Android with all-files access.
  */
 class Browser {
     @Volatile private var rootDir: File? = null
@@ -83,7 +82,12 @@ class Browser {
         val dir = resolve(rel) ?: return null
         if (!dir.isDirectory) return null
         val kids = dir.listFiles()?.filterNot { it.name.startsWith(UPLOAD_PREFIX) } ?: emptyList() // uploads in progress
-        val entries = kids.map { Entry(it.name, it.isDirectory, if (it.isFile) it.length() else 0L, it.lastModified()) }
+        // One attribute read per entry, not four (a phone's DCIM can hold thousands of photos).
+        val entries = kids.map { f ->
+            val a = runCatching { Files.readAttributes(f.toPath(), BasicFileAttributes::class.java) }.getOrNull()
+                ?: return@map Entry(f.name, false, 0L, 0L) // unreadable: listed, but not openable
+            Entry(f.name, a.isDirectory, if (a.isRegularFile) a.size() else 0L, a.lastModifiedTime().toMillis())
+        }
             .sortedWith(compareByDescending<Entry> { it.dir }.thenBy { it.name.lowercase() })
         return Listing(path = normalize(rel), entries = entries)
     }

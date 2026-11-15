@@ -36,8 +36,8 @@ kotlin {
         val jvmSharedMain by creating {
             dependsOn(commonMain)
             dependencies {
-                // Engine-agnostic Ktor server (routing, TLS material). The concrete engine
-                // (Netty on desktop, TBD on Android) is provided by each platform module.
+                // Engine-agnostic Ktor server (routing, TLS material). The engine (Netty) is
+                // provided by each platform module.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.websockets)
                 // Range requests, so shared videos can seek and stream in the chat preview.
