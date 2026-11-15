@@ -497,6 +497,12 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(json.encodeToString(webProxy.config()), ContentType.Application.Json)
             }
+            // Scan-to-open QR of the served site's URL (404 while nothing is served).
+            get("/admin/proxy/qr") {
+                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
+                val siteUrl = webProxy.config().url ?: return@get call.respond(HttpStatusCode.NotFound)
+                call.respondText(Qr.svg("$siteUrl/"), ContentType("image", "svg+xml"))
+            }
             post("/admin/proxy") {
                 if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val p = call.request.queryParameters

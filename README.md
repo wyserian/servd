@@ -145,7 +145,7 @@ turn it off; you can switch folders anytime. Paths that try to leave the folder 
 1. Start your app as usual (e.g. `npm run dev` on `http://localhost:3000`).
 2. In the **serve site** tab, enter that target and a port (default `8080`), then click
    **serve this site**.
-3. Everyone opens `https://<serving-address>:8080/`.
+3. Everyone opens `https://<serving-address>:8080/`, or scans the QR code shown in the tab.
 
 The app is served at the root, so SPA routes and absolute asset paths keep working. servd adds TLS,
 so even an HTTP-only or localhost-only app is reachable and encrypted across the LAN.

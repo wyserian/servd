@@ -326,6 +326,7 @@
   .fingerprint { display: flex; align-items: center; gap: 8px; }
   .fingerprint .v { font-size: 11.5px; color: var(--muted); }
   .qr { width: 140px; height: 140px; background: #fff; border-radius: 8px; padding: 8px; }
+  .qr[hidden] { display: none; }
   .dev-qr { margin-top: auto; padding: 12px 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--surface-2); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: background .15s, color .15s; }
   .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
@@ -594,6 +595,8 @@
         <div class="view" id="view-live" role="tabpanel">
           <div class="cfg-wrap"><div class="cfg">
             <div class="br-status" id="pxStatus">Off - no live site is being served.</div>
+            <img class="qr" id="pxQr" alt="Scan to open the served site on another device" width="140" height="140" hidden />
+            <span class="pin-note" id="pxQrNote" hidden>Scan to open the site on a phone.</span>
             <label class="px-field"><span class="px-label">Target (your running server)</span><input id="pxTarget" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:3000" /></label>
             <label class="px-field"><span class="px-label">Serve on port</span><input id="pxPort" type="number" min="1" max="65535" value="8080" /></label>
             <div class="br-actions">
@@ -1295,10 +1298,12 @@
         if(c.target) $("pxTarget").value=c.target;
         if(c.port) $("pxPort").value=c.port;
         syncPxBtn();
+        $("pxQr").src="/admin/proxy/qr?u="+encodeURIComponent(c.url); // the query refreshes it when the URL changes
       } else {
         $("pxStatus").textContent="Off - no live site is being served.";
         $("pxStop").hidden=true;
       }
+      $("pxQr").hidden = $("pxQrNote").hidden = !c.enabled;
       $("liveDot").classList.toggle("on", c.enabled);
     }).catch(()=>{});
   }
