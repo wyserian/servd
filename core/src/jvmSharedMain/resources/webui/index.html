@@ -24,9 +24,9 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0D1316; --surface: #141D21; --surface-2: #1A252A; --border: #253136; --border-strong: #35474E;
+      --bg: #07090A; --surface: #0E1214; --surface-2: #151B1E; --border: #1E272B; --border-strong: #2C383D;
       --ink: #E6EDEF; --muted: #90A3AA; --faint: #647A81;
-      --accent: #22C3A6; --accent-ink: #7BEBD8; --accent-soft: #113029;
+      --accent: #22C3A6; --accent-ink: #7BEBD8; --accent-soft: #0B231F;
       --idle: #5D7178; --error: #EE7169; --warn: #DFA24E;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
       --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
@@ -34,9 +34,9 @@
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0D1316; --surface: #141D21; --surface-2: #1A252A; --border: #253136; --border-strong: #35474E;
+    --bg: #07090A; --surface: #0E1214; --surface-2: #151B1E; --border: #1E272B; --border-strong: #2C383D;
     --ink: #E6EDEF; --muted: #90A3AA; --faint: #647A81;
-    --accent: #22C3A6; --accent-ink: #7BEBD8; --accent-soft: #113029;
+    --accent: #22C3A6; --accent-ink: #7BEBD8; --accent-soft: #0B231F;
     --idle: #5D7178; --error: #EE7169; --warn: #DFA24E;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
     --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
@@ -70,8 +70,7 @@
   .spacer { flex: 1 1 auto; }
   .namebox { position: relative; display: inline-flex; align-items: center; width: 130px; }
   .namebox .you-suffix { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--faint); pointer-events: none; }
-  .namebox input { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); font-family: var(--mono); font-size: 12.5px; border-radius: 8px; padding: 5px 34px 5px 9px; flex: 1; min-width: 0; }
-  .namebox input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .namebox input { background: var(--surface-2); color: var(--ink); font-family: var(--mono); font-size: 12.5px; border-radius: 8px; padding: 5px 34px 5px 9px; flex: 1; min-width: 0; }
   .host-chip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: background .15s ease, color .15s ease; }
   .host-chip:hover { background: var(--border); }
   .host-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -85,7 +84,7 @@
   .status-pill, .host-chip, .namebox input { height: 32px; }
 
   /* ---------- grid ---------- */
-  .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 7px; }
+  .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 7px; }
   .grid > * { min-width: 0; min-height: 0; }
   .panel { background: var(--surface); border-radius: var(--r); }
   .panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; }
@@ -122,6 +121,11 @@
   .mini-btn.btn-primary { background: var(--accent); color: #04150F; }
   .mini-btn.btn-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.07); }
   .mini-btn.btn-danger:hover:not(:disabled) { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
+  /* text fields: a soft edge at rest (the fill does most of the work), a soft accent edge while typing */
+  .namebox input, .composer textarea, .px-field input, .pin-field, .sto-input, .pin-input { border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  .namebox input:focus, .composer textarea:focus, .px-field input:focus, .pin-field:focus, .sto-input:focus, .pin-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+  /* one control height across the app: buttons and single-line fields are all 32px */
+  .px-field input, .pin-field, .sto-input { height: 32px; }
   .form-err { font-family: var(--mono); font-size: 11.5px; color: var(--error); line-height: 1.45; }
   .dl.del:hover { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
   .tab { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 9px 14px; border-radius: 8px 8px 0 0; position: relative; }
@@ -149,14 +153,14 @@
   .svc-connect .svc-k { flex-shrink: 0; width: 68px; font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
   .svc-box { display: inline-flex; align-items: stretch; width: min(100%, 440px); background: var(--surface-2); border-radius: 8px; overflow: hidden; }
   .svc-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; display: flex; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 7px 10px; }
-  .svc-box .svc-copy { flex-shrink: 0; width: 36px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+  .svc-box .svc-copy { flex-shrink: 0; width: 32px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
   .svc-box .svc-copy:hover { color: var(--accent-ink); background: var(--border); }
   .svc-copy.copied, .copy.copied { color: var(--accent-ink); }
   /* sharing tab = browse (left) + sharing config (right) */
   .share-split { flex: 1; min-height: 0; display: flex; gap: 8px; }
   .share-browse { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
   .share-browse .brlist { flex: 1; min-height: 0; overflow-y: auto; }
-  .share-config { flex: 0 0 320px; min-height: 0; overflow-y: auto; }
+  .share-config { flex: 0 0 370px; min-height: 0; overflow-y: auto; }
   .share-config .cfg-wrap { padding: 14px; } .share-config .cfg { max-width: none; }
 
   /* chat */
@@ -194,25 +198,22 @@
   .frow .fthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .file-msg .fi { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; }
   .composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 12px; }
-  .composer textarea { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 1.4; min-width: 0; resize: none; height: 40px; max-height: 120px; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
-  .composer textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .composer textarea { flex: 1; background: var(--surface-2); border-radius: 8px; padding: 6px 12px; color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 18px; min-width: 0; resize: none; height: 32px; max-height: 120px; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
   /* keep the placeholder on one line, truncated with an ellipsis, instead of wrapping on narrow screens */
   .composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Thin, button-less scrollbar for when the message grows past max-height (no native up/down arrows). */
   .composer textarea::-webkit-scrollbar { width: 8px; }
   .composer textarea::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
   .composer textarea::-webkit-scrollbar-track { background: transparent; }
-  /* uniform composer control height: textarea, attach button and send all 40px */
-  .composer .icon-btn { width: 40px; height: 40px; }
-  .send { width: 40px; height: 40px; flex-shrink: 0; background: var(--accent); color: #04150F; border: 0; border-radius: 10px; padding: 0; cursor: pointer; display: inline-grid; place-items: center; }
+  .send { width: 32px; height: 32px; flex-shrink: 0; background: var(--accent); color: #04150F; border: 0; border-radius: 8px; padding: 0; cursor: pointer; display: inline-grid; place-items: center; }
   .send:disabled { opacity: .45; cursor: default; }
   .send:hover { filter: brightness(1.05); }
   .send:disabled { opacity: .5; cursor: not-allowed; }
 
   /* files */
   .files-wrap { flex: 1; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
-  .drop { border: 1.5px dashed var(--border-strong); border-radius: var(--r); padding: 26px; text-align: center; color: var(--muted); background: var(--surface-2); display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
-  .drop:hover, .drop.over { border-color: var(--accent); color: var(--ink); }
+  .drop { border-radius: var(--r); padding: 26px; text-align: center; color: var(--muted); background: var(--surface-2); display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+  .drop:hover, .drop.over { background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); color: var(--ink); }
   .drop .big { color: var(--accent); }
   .drop strong { font-family: var(--mono); font-weight: 700; color: var(--ink); }
   .drop small { font-family: var(--mono); color: var(--faint); }
@@ -224,7 +225,6 @@
   .fsubrow { display: flex; align-items: center; gap: 10px; min-height: 28px; }
   .fsubrow .fsubname { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fsubrow .fsize { font-family: var(--mono); font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .fsubrow .dl { width: 26px; height: 26px; }
   .fsubrow.more { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
   .drop-foot { display: flex; flex-direction: column; gap: 4px; margin-top: -6px; }
   .drop-usage { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
@@ -265,8 +265,7 @@
   .br-write { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
   .px-field { display: flex; flex-direction: column; gap: 4px; }
   .px-label { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-  .px-field input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; color: var(--ink); font-family: var(--mono); font-size: 12px; width: 100%; }
-  .px-field input:focus { outline: none; border-color: var(--accent); }
+  .px-field input { background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12px; width: 100%; }
   #pxStatus a { color: var(--accent); word-break: break-all; }
   .br-pick-actions, .br-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -305,42 +304,42 @@
   .audio-only[hidden] { display: none; }
   .live-badge { color: var(--error); text-transform: uppercase; }
   .live-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
-  .live-row + .live-row { border-top: 1px solid var(--border); }
   .live-row .lr-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .live-row .lr-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-  .sys .mini-btn { margin-left: 8px; min-height: 24px; padding: 0 8px; }
+  .sys .mini-btn { margin-left: 8px; }
   .host-settings[hidden] { display: none; }
   .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .pref-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .pref-title { font-size: 13px; color: var(--ink); }
   .pin-note.warn { color: var(--warn); }
   .seg { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 3px; background: var(--surface); border-radius: 8px; }
-  .seg button { border: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+  .seg button { border: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 12px; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; }
   .seg button:hover { color: var(--ink); }
   .seg button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
   .set-sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--r); }
   .set-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .set-head h3 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
-  .set-sec .pin-field, .set-sec .sto-input { background: var(--surface); }
+  .set-sec .pin-field, .set-sec .sto-input { background-color: var(--surface); } /* -color: keeps the select's chevron */
   /* join PIN: the host's setting and the guests' PIN screen */
   .pin-state { font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .pin-state.on { color: var(--accent-ink); font-weight: 700; }
   .pin-set { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
-  .pin-field:focus, .pin-input:focus { outline: none; border-color: var(--accent); }
+  .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
   .pin-note, .lock-hint { font-size: 11.5px; color: var(--faint); line-height: 1.45; }
   .sto-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
   .sto-field { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 3px; }
   .sto-label { font-size: 11px; color: var(--muted); }
-  .sto-input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; width: 100%; }
-  .sto-input:focus { outline: none; border-color: var(--accent); }
-  .sto-save { min-height: 32px; }
+  .sto-input { background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; width: 100%; }
+  /* dropdowns: drop the OS look for the app's field style, with a themed chevron and option list */
+  select.sto-input { appearance: none; cursor: pointer; padding-right: 28px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  select.sto-input option { background-color: var(--surface); color: var(--ink); }
   .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
   .lock-screen[hidden] { display: none; }
   .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
   .lock-label { font-size: 14px; color: var(--ink); }
-  .pin-input { font-family: var(--mono); font-size: 24px; letter-spacing: .4em; text-align: center; padding: 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); width: 100%; }
-  .lock-box .mini-btn { min-height: 40px; font-size: 13px; }
+  .pin-input { font-family: var(--mono); font-size: 24px; letter-spacing: .4em; text-align: center; padding: 10px; background: var(--surface-2); border-radius: 8px; color: var(--ink); width: 100%; }
   .lock-box .brand { order: 0; } /* the mobile topbar reorders .brand; keep it on top here */
   .kv { display: flex; flex-direction: column; gap: 3px; }
   .k { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
@@ -587,7 +586,7 @@
             <div class="form-err" id="liveErr" role="alert" hidden></div>
             <!-- host only: other devices can only watch -->
             <section class="set-sec" id="goLiveBox" aria-labelledby="goLiveH" hidden>
-              <div class="set-head"><h3 id="goLiveH">Go live</h3><span class="pin-state">up to <span id="liveMax">10</span> viewers</span></div>
+              <div class="set-head"><h3 id="goLiveH">Live</h3><span class="pin-state">up to <span id="liveMax">10</span> viewers</span></div>
               <div class="pref-row">
                 <div class="seg" role="radiogroup" aria-label="What to stream">
                   <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
@@ -1568,8 +1567,8 @@
     const cs=getComputedStyle(textInput);
     const border=parseFloat(cs.borderTopWidth)+parseFloat(cs.borderBottomWidth);
     // empty: stay one line so a long placeholder never grows the box; otherwise size to content
-    const full=textInput.value ? textInput.scrollHeight+border : 40; // border-box: add borders so text isn't clipped
-    textInput.style.height=Math.max(40,Math.min(full,120))+"px"; // never below one line (40px), never above 120
+    const full=textInput.value ? textInput.scrollHeight+border : 32; // border-box: add borders so text isn't clipped
+    textInput.style.height=Math.max(32,Math.min(full,120))+"px"; // never below one line (32px), never above 120
     textInput.style.overflowY = full>120 ? "auto" : "hidden";
   }
   function sendMsg(){ const t=textInput.value.replace(/\s+$/,""); if(!t||!ws||ws.readyState!==1) return; ws.send(JSON.stringify({type:"chat",text:t})); textInput.value=""; autoGrow(); }
