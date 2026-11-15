@@ -77,7 +77,7 @@ fun jpackageCommand(type: String): List<String> {
         "--main-class", "dev.servd.host.MainKt",
         "--dest", dest.absolutePath,
         "--vendor", "servd",
-        "--description", "servd - local-network server tool",
+        "--description", "servd - your device, as a local-network hub",
     )
     // servd is a console app: it prints the URL/fingerprint and waits for Ctrl+C. Without this,
     // jpackage's Windows launcher is a windowless GUI app - the user would see nothing and have

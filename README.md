@@ -88,7 +88,7 @@ Desktop builds bundle their own Java runtime, so nothing else is needed. To buil
 On start, servd prints:
 
 ```
-servd v1.7.0 - local-network server tool
+servd v1.7.0 - your device, as a local-network hub
 
 admin   : https://127.0.0.1:8443   (this machine only)
 serving : https://10.205.210.12:8443   (share with other devices)

@@ -44,7 +44,7 @@ import dev.servd.core.update.Update
 class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
-    private lateinit var detailText: TextView
+    private lateinit var details: LinearLayout
     private lateinit var qr: ImageView
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
@@ -58,6 +58,7 @@ class MainActivity : Activity() {
     private val ink = Color.parseColor("#0F1A1F")
     private val muted = Color.parseColor("#5A6B72")
     private val accent = Color.parseColor("#1F6F5C")
+    private val warn = Color.parseColor("#B9770E")
 
     private val stateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = render()
@@ -145,7 +146,7 @@ class MainActivity : Activity() {
         }
 
         root.addView(TextView(this).apply {
-            text = "Your device, as a local-network hub"
+            text = Servd.TAGLINE.replaceFirstChar { it.uppercase() }
             setTextColor(muted)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
             setPadding(0, 0, 0, dp(10))
@@ -194,16 +195,9 @@ class MainActivity : Activity() {
         }
         card.addView(qr)
 
-        // Connection details (each field label bold); the app version is pinned below the card.
-        detailText = TextView(this).apply {
-            setTextColor(ink)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(dp(2).toFloat(), 1f)
-            setPadding(0, dp(8), 0, dp(4))
-            setTextIsSelectable(true)
-        }
-        card.addView(detailText)
+        // Connection details, rebuilt by render(); the app version is pinned below the card.
+        details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        card.addView(details)
         root.addView(card)
 
         updateButton = button("Update", Color.WHITE, accent) { startUpdate() }.apply { visibility = View.GONE }
@@ -260,11 +254,12 @@ class MainActivity : Activity() {
         storageButton.isEnabled = !hasAllFilesAccess()
 
         statusText.setTextColor(if (running) accent else muted)
+        details.removeAllViews()
         if (info == null || !running) {
             statusText.text = "Hub is stopped"
             qr.visibility = View.GONE
-            detailText.text = "Start the hub, then open the dashboard here or scan the QR from another " +
-                "device on the same Wi-Fi or hotspot."
+            details.addView(note("Start the hub, then open the dashboard here or scan the QR from another " +
+                "device on the same Wi-Fi or hotspot.", top = 0))
             return
         }
 
@@ -272,35 +267,60 @@ class MainActivity : Activity() {
         runCatching { qr.setImageBitmap(QrBitmap.of("${info.url}/", dp(200))) }
         qr.visibility = View.VISIBLE
 
-        detailText.text = connectionDetails(info)
+        details.addView(field("Share", "${info.url}/", hint = "scan or open on other devices", size = 15f))
+        info.localUrl?.let { details.addView(field("By name", "$it/", hint = "iPhone, Mac, Windows, Linux")) }
+        details.addView(field("Admin", "${info.adminUrl}/", hint = "this device only"))
+        if (!info.onLan) {
+            details.addView(field("Network", "No Wi-Fi or hotspot detected. Reachable on this device only " +
+                "until you connect one.", mono = false, color = warn))
+        }
+        val fp = info.fingerprint.split(":").chunked(8).joinToString("\n") { it.joinToString(":") } // never splits a byte
+        details.addView(field("Certificate", fp, hint ="SHA-256, verify on first connect", size = 12f))
+        details.addView(pair(field("SSH / SFTP port", "${info.sshPort}"), field("FTPS port", "${info.ftpPort}")))
+        details.addView(pair(field("User", info.username), field("Password", info.password)))
+        details.addView(note("SSH and FTP start off. Turn them on from the admin dashboard on this device."))
     }
 
-    /** Connection details for the host card, with each field label in bold. */
-    private fun connectionDetails(info: ServdHost.Info): CharSequence {
-        val sb = SpannableStringBuilder()
-        fun heading(title: String, note: String? = null) {
-            if (sb.isNotEmpty()) sb.append("\n")
-            val start = sb.length
-            sb.append(title)
-            sb.setSpan(StyleSpan(Typeface.BOLD), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            if (note != null) sb.append("  ").append(note)
-            sb.append('\n')
-        }
-        heading("Admin", "(this device only)"); sb.append(info.adminUrl).append("/")
-        heading("Share"); sb.append(info.url).append("/")
-        info.localUrl?.let { heading("By name", "(iPhone, Mac, Windows, Linux)"); sb.append(it).append("/") }
-        if (!info.onLan) {
-            heading("Network")
-            sb.append("No Wi-Fi/hotspot detected - reachable on this device only until you connect one.")
-        }
-        heading("Certificate", "(self-signed)")
-        sb.append("Verify this SHA-256 fingerprint on first connect:\n").append(info.fingerprint)
-        heading("SSH / SFTP")
-        sb.append("port ${info.sshPort}   user ${info.username}   pass ${info.password}")
-        heading("FTPS")
-        sb.append("port ${info.ftpPort}   user ${info.username}   pass ${info.password}")
-        sb.append("\n\nSSH and FTP start off - enable them from the admin dashboard on this device.")
-        return sb
+    /** One detail: a small caps label (with an optional hint) over a selectable value. */
+    private fun field(
+        label: String, value: String, hint: String? = null,
+        size: Float = 14f, mono: Boolean = true, color: Int = ink,
+    ): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(0, dp(14), 0, 0)
+        addView(TextView(context).apply {
+            val sb = SpannableStringBuilder(label.uppercase())
+            sb.setSpan(StyleSpan(Typeface.BOLD), 0, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (hint != null) sb.append("  ·  ").append(hint)
+            text = sb
+            setTextColor(muted)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            letterSpacing = 0.04f
+        })
+        addView(TextView(context).apply {
+            text = value
+            setTextColor(color)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
+            typeface = if (mono) Typeface.MONOSPACE else Typeface.DEFAULT
+            setPadding(0, dp(3), 0, 0)
+            setTextIsSelectable(true)
+        })
+    }
+
+    /** Two details side by side, each taking half the width. */
+    private fun pair(left: View, right: View): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        val half = { LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
+        addView(left, half())
+        addView(right, half())
+    }
+
+    private fun note(text: String, top: Int = 14): View = TextView(this).apply {
+        this.text = text
+        setTextColor(muted)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        setLineSpacing(dp(2).toFloat(), 1f)
+        setPadding(0, dp(top), 0, dp(4))
     }
 
     private fun startHub() {

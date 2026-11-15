@@ -4,5 +4,5 @@ package dev.servd.core
 object Servd {
     const val NAME = "servd"
     const val VERSION = "1.7.0"
-    const val TAGLINE = "local-network server tool"
+    const val TAGLINE = "your device, as a local-network hub"
 }
