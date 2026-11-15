@@ -231,7 +231,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             when (val msg = chatHub.parseClient(frame.readText())) {
-                                is Hello -> chatHub.onHello(id, msg.name)
+                                is Hello -> chatHub.onHello(id, msg.name, msg.deviceId)
                                 is ChatSend -> chatHub.onChat(id, msg.text)
                                 is ClearChat -> chatHub.onClearChat(id)
                                 // Only the host goes live; other devices can only watch.

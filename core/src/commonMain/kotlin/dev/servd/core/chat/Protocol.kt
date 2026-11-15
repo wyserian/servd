@@ -21,7 +21,7 @@ sealed interface ClientMessage
 
 @Serializable
 @SerialName("hello")
-data class Hello(val name: String) : ClientMessage
+data class Hello(val name: String, val deviceId: String? = null) : ClientMessage // tabs of one browser share deviceId
 
 @Serializable
 @SerialName("chat")
@@ -84,7 +84,7 @@ sealed interface ServerMessage
 
 @Serializable
 @SerialName("welcome")
-data class Welcome(val selfId: String, val serverName: String) : ServerMessage
+data class Welcome(val selfId: String, val serverName: String, val peerId: String? = null) : ServerMessage // peerId: this device's roster entry
 
 @Serializable
 @SerialName("roster")

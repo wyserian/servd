@@ -772,7 +772,11 @@
   let unseen = 0; // messages/files from others since this page was last looked at (see "new-activity alerts")
   function setTitle(){ document.title = (unseen ? "(" + unseen + ") " : "") + (userName ? userName + " · " : "") + "servd"; }
   setTitle();
-  let selfId=null, ws=null, retry=null, lastConnected=0;
+  let selfId=null, myPeerId=null, ws=null, retry=null, lastConnected=0;
+  const DEVICE_ID = (()=>{ // shared by this browser's tabs, so they list as one device
+    try { let d=localStorage.getItem("servd-device"); if(!d){ d=newBatchId(); localStorage.setItem("servd-device",d); } return d; }
+    catch { return newBatchId(); }
+  })();
   const files = new Map();
   const uploads = new Map(); let upSeq = 0; // upload rows (a loose file, or a whole dropped folder): id -> state
 
@@ -833,7 +837,7 @@
     if (!peers.length){ roster.innerHTML = '<div class="dev-empty">No devices yet. Open this page on another device on the same network.</div>'; return; }
     roster.innerHTML = "";
     for (const p of peers){
-      const you = p.id===selfId ? ' <span class="tag-you">you</span>' : "";
+      const you = p.id===(myPeerId||selfId) ?' <span class="tag-you">you</span>' : "";
       const row = document.createElement("div"); row.className="dev";
       row.innerHTML =
         '<div class="ava" style="background:'+colorFor(p.name)+'">'+initials(p.name)+'</div>'+
@@ -1900,7 +1904,7 @@
     ws.onerror=()=>ws.close();
     ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data); }catch{ return; }
       switch(m.type){
-        case "welcome": selfId=m.selfId; break;
+        case "welcome": selfId=m.selfId; myPeerId=m.peerId||null; break;
         case "roster": renderRoster(m.peers); break;
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); if(m.fromId!==selfId) noteActivity(m.fromName, m.text.length>140 ? m.text.slice(0,140)+"…" : m.text, "chat"); break;
         case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
@@ -1917,7 +1921,7 @@
       }
     };
   }
-  function sayHello(){ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:"hello",name:userName})); }
+  function sayHello(){ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:"hello",name:userName,deviceId:DEVICE_ID})); }
 
   // ---- join PIN ----
   // Guests: when the host set a PIN, nothing loads until it's entered (the server refuses anyway).

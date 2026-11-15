@@ -26,7 +26,9 @@ class ChatHub(private val serverName: String) {
         val address: String,
         @Volatile var name: String? = null,
         val sendLock: Mutex = Mutex(),
-    )
+    ) {
+        @Volatile var peerId: String = id // roster entry, shared by tabs of one device
+    }
 
     private val conns = ConcurrentHashMap<String, Conn>()
     private val registry = PeerRegistry()
@@ -49,13 +51,15 @@ class ChatHub(private val serverName: String) {
         return id
     }
 
-    suspend fun onHello(id: String, name: String) {
+    suspend fun onHello(id: String, name: String, deviceId: String? = null) {
         val conn = conns[id] ?: return
         val clean = name.trim().ifBlank { "guest" }.take(40)
+        conn.peerId = peerIdFor(id, deviceId, conn.address)
         conn.name = clean
-        val peer = Peer(id, clean, conn.address)
-        registryLock.withLock { registry.put(peer) }
-        broadcast(PresenceEvent("join", peer))
+        val peer = Peer(conn.peerId, clean, conn.address)
+        val isNew = registryLock.withLock { registry.put(peer) }
+        sendTo(id, Welcome(id, serverName, conn.peerId))
+        if (isNew) broadcast(PresenceEvent("join", peer)) // not for a second tab or a rename
         broadcastRoster()
         sendTo(id, liveList()) // who is already live
         sendTo(id, mediaSession()) // and what is playing, so a late joiner catches up
@@ -69,12 +73,16 @@ class ChatHub(private val serverName: String) {
     }
 
     suspend fun onDisconnect(id: String) {
-        conns.remove(id)
+        val conn = conns.remove(id)
         val gone = liveLock.withLock { live.removePeer(id) }
         for ((streamId, ownerId) in gone.leftFrom) sendTo(ownerId, LiveViewer(streamId, id, joined = false))
         if (gone.changed) broadcastLive()
         endPlaybackIf { it.ownerId == id } // the host who started it left
-        val peer = registryLock.withLock { registry.remove(id) } ?: return
+        val peerId = conn?.takeIf { it.name != null }?.peerId ?: return // never said hello
+        val peer = registryLock.withLock {
+            // the device stays listed while another of its tabs is open
+            if (conns.values.any { it.name != null && it.peerId == peerId }) null else registry.remove(peerId)
+        } ?: return
         broadcast(PresenceEvent("leave", peer))
         broadcastRoster()
     }
