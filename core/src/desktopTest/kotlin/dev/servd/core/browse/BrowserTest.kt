@@ -32,6 +32,7 @@ class BrowserTest {
 
     @Test
     fun filesUnder_lists_nested_files_relative_to_the_folder() = withTree { root, _ ->
+        File(root, "sub/.servd-upload-123.part").writeText("half") // an upload still in progress
         val b = Browser().apply { enable(root.path, writable = false) }
         assertEquals(listOf("a.txt", "sub/b.txt", "sub/deep/c.txt"), zipPaths(b, ""))
         assertEquals(listOf("b.txt", "deep/c.txt"), zipPaths(b, "sub"))

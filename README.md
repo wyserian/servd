@@ -48,8 +48,8 @@ configure the host appear only on the host itself.
 - **Live streams:** the host goes live with their camera, microphone or (in desktop browsers) screen,
   and up to 10 devices watch. Media goes peer to peer over the LAN with WebRTC, so the hub isn't
   loaded.
-- **Watch together:** the host plays a shared video or audio file for everyone. With sync on, the
-  host's play, pause and seek apply on every device.
+- **Watch together:** the host plays a shared video or audio file, a YouTube video or an https
+  media link for everyone. With sync on, the host's play, pause and seek apply on every device.
 - **Previews:** shared files preview inline in chat: images (with a full-size viewer), video and
   audio players, and the first lines of text and code files. Image files also get thumbnails in the
   file list.
@@ -133,7 +133,7 @@ grant all-files access. The folder picker then starts at Internal storage.
 | **drop files** | everyone | shared files and folders pushed to every device |
 | **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
 | **chat** | everyone | real-time chat |
-| **stream** | everyone | watch the host's live stream or the file it's playing for everyone; the host can go live (camera / microphone / screen) or play a file |
+| **stream** | everyone | watch the host's live stream or the file it's playing for everyone; the host can go live (camera / microphone / screen) or play a file or link |
 | **serve site** | host only | re-serve a running web app to the LAN |
 | **ssh** / **ftp** | host only | turn the server on or off; shows the port, password and connect command |
 
@@ -176,7 +176,8 @@ Things to know:
 **Watch together (play a file for everyone):**
 1. **Start (host):** in the **stream** tab, pick a shared video or audio file and click **play**.
    Alternatively, choose a file from your device, which also shares it, or press **▶** on a
-   video/audio row in drop files.
+   video/audio row in drop files. Or paste a link and click **play link**: a YouTube video, or an
+   `https://` link straight to a video or audio file.
 2. **Join (everyone else):** the player appears with a chat note. With sync on, they tap
    **join playback** once, because browsers need a tap before playing sound.
 
@@ -191,6 +192,8 @@ Limits:
 - **Viewers:** each device streams the file from the hub, so there's no 10-viewer cap.
 - **Formats:** whatever the browser plays (MP4/H.264, WebM, MP3, M4A, OGG, WAV, FLAC). MKV and AVI
   often don't play.
+- **Links:** each device streams the link from the internet, so every device needs internet
+  access. Some YouTube videos can't be played this way because their owner turned off embedding.
 - **Ending:** playback ends when the host stops it, leaves, or the file is deleted.
 
 ### Join PIN & Storage Limits
@@ -334,7 +337,7 @@ servd/
   | Host status | `GET /status`: host info + fingerprint |
   | Chat | WebSocket `/ws`: announce a name, then chat |
   | Live streams | over `/ws`: `liveStart` / `liveStop` / `liveWatch` / `liveLeave`, and `signal` messages relayed between a streamer and its viewers (`LiveRegistry`) |
-  | Watch together | over `/ws`: `mediaPlay` / `mediaState` / `mediaStop` from the host (`Playback`); everyone gets `mediaSession` and streams `GET /files/{id}` |
+  | Watch together | over `/ws`: `mediaPlay` (a shared file) or `mediaPlayUrl` (a YouTube or https link, checked by `MediaLink`) / `mediaState` / `mediaStop` from the host (`Playback`); everyone gets `mediaSession` and streams `GET /files/{id}` or the link |
   | Drop files | `POST /files?name=&from=&device=` upload, the body is the file (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
   | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload?path=&name=` (body is the file) when writable |
   | Serve site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |

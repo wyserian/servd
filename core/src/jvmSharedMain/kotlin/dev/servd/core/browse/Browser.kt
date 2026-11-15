@@ -102,7 +102,7 @@ class Browser {
         val seen = HashSet<String>()
         val files = dir.walkTopDown()
             .onEnter { d -> d.canonicalFile.let { base.holds(it) && seen.add(it.path) } }
-            .filter { it.isFile && base.holds(it.canonicalFile) }
+            .filter { it.isFile && !it.name.startsWith(UPLOAD_PREFIX) && base.holds(it.canonicalFile) }
             .map { it.relativeTo(dir).invariantSeparatorsPath to it }
         return dir to files
     }

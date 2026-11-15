@@ -143,7 +143,9 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     }
 
     private fun Application.proxyModule(target: String) {
-        install(WebSockets)
+        // Generous for app sockets (HMR, live data), but bounded: a visitor can't make the hub
+        // buffer a multi-GB frame.
+        install(WebSockets) { maxFrameSize = 16L shl 20 }
         // Join PIN: without a hub session, point the visitor at the hub to enter the PIN first.
         intercept(ApplicationCallPipeline.Plugins) {
             if (!allows(call)) {
