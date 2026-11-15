@@ -767,7 +767,8 @@
   const dot=$("dot"), statusPill=$("statusPill"), statusText=$("statusText");
 
   // NB: named userName, not name, to avoid colliding with the global window.name (always a string).
-  let userName = localStorage.getItem("servd-name") || ("guest-" + Math.floor(1000 + Math.random()*9000));
+  let userName = null; try { userName = localStorage.getItem("servd-name"); } catch {}
+  if (!userName) { userName = "guest-" + Math.floor(1000 + Math.random()*9000); try { localStorage.setItem("servd-name", userName); } catch {} } // keep it across reloads and tabs
   nameInput.value = userName;
   let unseen = 0; // messages/files from others since this page was last looked at (see "new-activity alerts")
   function setTitle(){ document.title = (unseen ? "(" + unseen + ") " : "") + (userName ? userName + " · " : "") + "servd"; }
