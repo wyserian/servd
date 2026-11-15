@@ -130,11 +130,11 @@ grant all-files access. The folder picker then starts at Internal storage.
 | Tab | Who sees it | What it does |
 |---|---|---|
 | **drop files** | everyone | shared files and folders pushed to every device |
+| **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
 | **chat** | everyone | real-time chat |
 | **stream** | everyone | watch the host's live stream or the file it's playing for everyone; the host can go live (camera / microphone / screen) or play a file |
-| **browse files** | host; clients once a folder is shared | left: browse and download the shared folder; right (host only): folder picker |
 | **serve site** | host only | re-serve a running web app to the LAN |
-| **ftp** / **ssh** | host only | turn the server on or off; shows the port, password and connect command |
+| **ssh** / **ftp** | host only | turn the server on or off; shows the port, password and connect command |
 
 The ⚙ **settings** button at the right of the top bar opens a side drawer:
 
