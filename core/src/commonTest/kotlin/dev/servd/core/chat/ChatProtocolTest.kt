@@ -4,26 +4,38 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PeerRegistryTest {
     @Test
-    fun put_reports_new_then_updates_in_place() {
+    fun join_reports_new_then_updates_in_place() {
         val r = PeerRegistry()
-        assertTrue(r.put(Peer("1", "alice", "10.0.0.2")))
-        assertTrue(!r.put(Peer("1", "alice-renamed", "10.0.0.2"))) // same id -> not new
+        assertTrue(r.join(Peer("1", "alice", "10.0.0.2"), "c1"))
+        assertTrue(!r.join(Peer("1", "alice-renamed", "10.0.0.2"), "c1")) // same id -> not new
         assertEquals(1, r.size)
         assertEquals("alice-renamed", r.get("1")?.name)
     }
 
     @Test
-    fun remove_and_snapshot_preserve_join_order() {
+    fun a_device_with_two_tabs_leaves_only_when_the_last_closes() {
         val r = PeerRegistry()
-        r.put(Peer("1", "a", "x")); r.put(Peer("2", "b", "y")); r.put(Peer("3", "c", "z"))
+        assertTrue(r.join(Peer("dev", "bob", "x"), "tab1"))
+        assertTrue(!r.join(Peer("dev", "bob", "x"), "tab2"), "second tab: same device, no new join")
+        assertNull(r.leave("dev", "tab1"), "one tab still open")
+        assertTrue(r.contains("dev"))
+        assertEquals("bob", r.leave("dev", "tab2")?.name)
+        assertTrue(!r.contains("dev"))
+        assertNull(r.leave("dev", "tab2"), "already gone")
+    }
+
+    @Test
+    fun leave_and_snapshot_preserve_join_order() {
+        val r = PeerRegistry()
+        r.join(Peer("1", "a", "x"), "c1"); r.join(Peer("2", "b", "y"), "c2"); r.join(Peer("3", "c", "z"), "c3")
         assertEquals(listOf("a", "b", "c"), r.snapshot().map { it.name })
-        assertEquals("b", r.remove("2")?.name)
+        assertEquals("b", r.leave("2", "c2")?.name)
         assertEquals(listOf("a", "c"), r.snapshot().map { it.name })
-        assertTrue(!r.contains("2"))
     }
 }
 

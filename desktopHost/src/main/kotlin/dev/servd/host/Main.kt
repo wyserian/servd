@@ -61,8 +61,11 @@ fun main(args: Array<String>) {
     val advertisedHost = opts.host ?: lan?.ip ?: "127.0.0.1"
     val bindHost = opts.host ?: "0.0.0.0"
 
+    // The host's dashboard is opened with this token; without it, loopback alone isn't admin.
+    val adminToken = ServdCredentials.loadOrCreateAdminToken(dataDir)
+
     println("${Servd.NAME} v${Servd.VERSION} - ${Servd.TAGLINE}")
-    if (!portFree(bindHost, opts.port)) portInUse(opts.port, opts.noOpen)
+    if (!portFree(bindHost, opts.port)) portInUse(opts.port, opts.noOpen, adminToken)
     if (opts.host == null && lan == null) {
         println("(no LAN address found - reachable at 127.0.0.1 only; connect Wi-Fi/hotspot for other devices)")
     }
@@ -105,6 +108,7 @@ fun main(args: Array<String>) {
         proxyPort = opts.proxyPort,
         pinFile = File(dataDir, "join.pin"),
         limitsFile = File(dataDir, "storage.properties"),
+        adminToken = adminToken,
     )
     if (opts.maxStorage != null || opts.expire != null) {
         // A flag replaces that saved limit ("off" clears it); the other one is kept.
@@ -126,7 +130,7 @@ fun main(args: Array<String>) {
 
     // When bound to all interfaces, the host reaches admin via loopback; a specific --host
     // means admin is only available if that host is itself loopback.
-    val localUrl = if (bindHost == "0.0.0.0") "https://127.0.0.1:${opts.port}/" else server.url
+    val localUrl = if (bindHost == "0.0.0.0") adminUrl(opts.port, adminToken) else server.url
 
     // Advertise over mDNS so other devices can find this hub without typing an IP: the
     // _servd._tcp service (for `servd discover`) and the friendly .local name (e.g. servd.local).
@@ -150,7 +154,7 @@ fun main(args: Array<String>) {
 
     println()
     if (bindHost == "0.0.0.0") {
-        println("admin   : https://127.0.0.1:${opts.port}   (this machine only)")
+        println("admin   : $localUrl   (this machine only - keep the link private)")
     }
     println("serving : ${server.url}   (share with other devices)")
     server.localName?.let { println("by name : https://$it:${opts.port}   (iPhone, Mac, Windows, Linux - Android may need the IP)") }
@@ -184,7 +188,7 @@ fun main(args: Array<String>) {
     } catch (e: Exception) {
         // Lost a race for the port after the check above (or another program holds it only on
         // the address we bind): same friendly message instead of a stack trace.
-        if (generateSequence<Throwable>(e) { it.cause }.any { it is BindException }) portInUse(opts.port, noOpen = true)
+        if (generateSequence<Throwable>(e) { it.cause }.any { it is BindException }) portInUse(opts.port, noOpen = true, adminToken)
         throw e
     }
 }
@@ -231,6 +235,9 @@ private fun usageError(message: String): Nothing {
     exitProcess(1)
 }
 
+/** The host's dashboard link: loopback plus the admin token (the hub swaps it for a cookie). */
+private fun adminUrl(port: Int, adminToken: String) = "https://127.0.0.1:$port/?admin=$adminToken"
+
 private fun portFree(host: String, port: Int): Boolean =
     runCatching { ServerSocket().use { it.bind(InetSocketAddress(host, port)) } }.isSuccess
 
@@ -239,13 +246,14 @@ private fun portFree(host: String, port: Int): Boolean =
  * dashboard and exit; otherwise explain and wait for Enter, so a double-clicked console window
  * doesn't vanish before the message can be read.
  */
-private fun portInUse(port: Int, noOpen: Boolean): Nothing {
+private fun portInUse(port: Int, noOpen: Boolean, adminToken: String): Nothing {
     val running = runningServdVersion(port)
     println()
     if (running != null) {
         println("servd v$running is already running on port $port: https://127.0.0.1:$port")
         println("Stop it first, or start another hub with --port N.")
-        if (!noOpen) runCatching { Desktop.getDesktop().browse(URI("https://127.0.0.1:$port/")) }
+        // Same data folder, same token (a hub started with another --dir just opens as a guest view).
+        if (!noOpen) runCatching { Desktop.getDesktop().browse(URI(adminUrl(port, adminToken))) }
         exitProcess(0)
     }
     println("Port $port is already in use by another program.")

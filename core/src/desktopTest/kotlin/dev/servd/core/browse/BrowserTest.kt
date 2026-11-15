@@ -4,8 +4,10 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class BrowserTest {
 
@@ -54,6 +56,32 @@ class BrowserTest {
         assertNull(b.filesUnder("missing"))
         b.disable()
         assertNull(b.filesUnder(""))
+    }
+
+    @Test
+    fun a_drive_or_filesystem_root_can_be_shared() = withTree { root, _ ->
+        val drive = root.canonicalFile.toPath().root.toFile() // "C:\" or "/": its path ends in a separator
+        val b = Browser().apply { enable(drive.path, writable = false) }
+        val rel = root.canonicalPath.removePrefix(drive.path)
+        assertEquals(listOf("sub", "a.txt"), b.list(rel)?.entries?.map { it.name })
+        assertEquals("a", b.download("$rel/a.txt")?.readText())
+    }
+
+    @Test
+    fun uploads_never_replace_a_file_and_a_failed_one_leaves_nothing() = withTree { root, _ ->
+        val b = Browser().apply { enable(root.path, writable = true) }
+        assertTrue(b.upload("", "a.txt", "new".byteInputStream()))
+        assertTrue(b.upload("", "a.txt", "newer".byteInputStream()))
+        assertEquals("a", File(root, "a.txt").readText(), "the host's file is untouched")
+        assertEquals("new", File(root, "a (2).txt").readText())
+        assertEquals("newer", File(root, "a (3).txt").readText())
+
+        val broken = object : java.io.InputStream() {
+            var sent = 0
+            override fun read(): Int = if (sent++ < 10) 'x'.code else throw java.io.IOException("connection lost")
+        }
+        assertFailsWith<java.io.IOException> { b.upload("sub", "cut.txt", broken) }
+        assertEquals(listOf("b.txt", "deep"), File(root, "sub").list()!!.sorted(), "no partial or temp file left")
     }
 
     @Test

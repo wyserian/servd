@@ -73,6 +73,8 @@ class FileStore(
         input: InputStream,
         path: String? = null,
         batch: String? = null,
+        /** The uploader's roster id, so dashboards can tell their own files apart from same-named devices'. */
+        fromId: String? = null,
     ): FileMeta {
         if (room() <= 0) throw StorageFullException(usage())
         val id = UUID.randomUUID().toString()
@@ -112,6 +114,7 @@ class FileStore(
             size = target.length(),
             contentType = contentType,
             fromName = fromName,
+            fromId = fromId,
             ts = System.currentTimeMillis(),
         ).let { m ->
             val cleanBatch = batch?.takeIf { BATCH_ID.matches(it) }

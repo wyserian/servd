@@ -7,15 +7,24 @@ package dev.servd.core.chat
  */
 class PeerRegistry {
     private val peers = LinkedHashMap<String, Peer>()
+    private val conns = HashMap<String, MutableSet<String>>() // peer id -> its open connections (tabs)
 
-    /** Add or update a peer (by id). Returns true if this id was not present before. */
-    fun put(peer: Peer): Boolean {
+    /** Connection [connId] says hello as [peer] (adds or renames it). True if the device is new. */
+    fun join(peer: Peer, connId: String): Boolean {
         val isNew = !peers.containsKey(peer.id)
         peers[peer.id] = peer
+        conns.getOrPut(peer.id) { mutableSetOf() } += connId
         return isNew
     }
 
-    fun remove(id: String): Peer? = peers.remove(id)
+    /** Connection [connId] of [peerId] closed. Returns the peer if that was its last one (it leaves the roster). */
+    fun leave(peerId: String, connId: String): Peer? {
+        val open = conns[peerId] ?: return null
+        open -= connId
+        if (open.isNotEmpty()) return null
+        conns.remove(peerId)
+        return peers.remove(peerId)
+    }
 
     fun get(id: String): Peer? = peers[id]
 

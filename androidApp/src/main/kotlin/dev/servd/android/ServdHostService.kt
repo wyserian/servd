@@ -55,11 +55,7 @@ class ServdHostService : Service() {
     private fun stopHost() {
         ServdHost.stop()
         broadcastState()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION") stopForeground(true)
-        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
@@ -109,23 +105,16 @@ class ServdHostService : Service() {
     }
 
     private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(CHANNEL_ID, "servd hub", NotificationManager.IMPORTANCE_LOW)
-                        .apply { description = "Keeps the servd hub running" },
-                )
-            }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "servd hub", NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = "Keeps the servd hub running" },
+            )
         }
     }
 
-    private fun pendingFlags(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+    private fun pendingFlags(): Int = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
     companion object {
         const val ACTION_START = "dev.servd.android.action.START"
@@ -135,12 +124,7 @@ class ServdHostService : Service() {
         private const val NOTIFICATION_ID = 1
 
         fun start(context: Context) {
-            val intent = Intent(context, ServdHostService::class.java).setAction(ACTION_START)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(Intent(context, ServdHostService::class.java).setAction(ACTION_START))
         }
 
         fun stop(context: Context) {

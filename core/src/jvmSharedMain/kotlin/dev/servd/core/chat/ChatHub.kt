@@ -54,11 +54,16 @@ class ChatHub(private val serverName: String) {
     suspend fun onHello(id: String, name: String, deviceId: String? = null) {
         val conn = conns[id] ?: return
         val clean = name.trim().ifBlank { "guest" }.take(40)
-        conn.peerId = peerIdFor(id, deviceId, conn.address)
-        conn.name = clean
-        val peer = Peer(conn.peerId, clean, conn.address)
-        val isNew = registryLock.withLock { registry.put(peer) }
-        sendTo(id, Welcome(id, serverName, conn.peerId))
+        val peer = Peer(peerIdFor(id, deviceId, conn.address), clean, conn.address)
+        val (isNew, left) = registryLock.withLock {
+            // A tab that says hello again under another device id leaves its old entry.
+            val old = conn.peerId.takeIf { conn.name != null && it != peer.id }
+            conn.peerId = peer.id
+            conn.name = clean
+            registry.join(peer, id) to old?.let { registry.leave(it, id) }
+        }
+        sendTo(id, Welcome(id, serverName, peer.id))
+        left?.let { broadcast(PresenceEvent("leave", it)) }
         if (isNew) broadcast(PresenceEvent("join", peer)) // not for a second tab or a rename
         broadcastRoster()
         sendTo(id, liveList()) // who is already live
@@ -79,10 +84,8 @@ class ChatHub(private val serverName: String) {
         if (gone.changed) broadcastLive()
         endPlaybackIf { it.ownerId == id } // the host who started it left
         val peerId = conn?.takeIf { it.name != null }?.peerId ?: return // never said hello
-        val peer = registryLock.withLock {
-            // the device stays listed while another of its tabs is open
-            if (conns.values.any { it.name != null && it.peerId == peerId }) null else registry.remove(peerId)
-        } ?: return
+        // The device stays listed while another of its tabs is open.
+        val peer = registryLock.withLock { registry.leave(peerId, id) } ?: return
         broadcast(PresenceEvent("leave", peer))
         broadcastRoster()
     }

@@ -123,6 +123,8 @@ data class FileMeta(
     val path: String? = null,
     /** Groups the files of one folder drop (shown as one folder row); null for a loose file. */
     val batch: String? = null,
+    /** The uploader's roster id (see [peerIdFor]); null if its dashboard didn't say. */
+    val fromId: String? = null,
 )
 
 /** Broadcast when someone uploads a file, so every dashboard updates live. */

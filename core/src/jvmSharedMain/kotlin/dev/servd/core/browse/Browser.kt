@@ -3,6 +3,8 @@ package dev.servd.core.browse
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.io.InputStream
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
 
 /**
  * Serves a host-chosen directory (the "browse root") to LAN clients: list, download, and - when
@@ -69,15 +71,18 @@ class Browser {
         val base = rootDir ?: return null
         val clean = rel.trim().trimStart('/', '\\')
         val target = (if (clean.isEmpty()) base else File(base, clean)).canonicalFile
-        if (target.path != base.path && !target.path.startsWith(base.path + File.separator)) return null
-        return target
+        return target.takeIf { base.holds(it) }
     }
+
+    /** [f] (canonical) is this folder or inside it. A drive or filesystem root already ends in a separator. */
+    private fun File.holds(f: File): Boolean =
+        f.path == path || f.path.startsWith(path.removeSuffix(File.separator) + File.separator)
 
     /** Folders + files directly under [rel] (relative to the root); null if not a directory. */
     fun list(rel: String): Listing? {
         val dir = resolve(rel) ?: return null
         if (!dir.isDirectory) return null
-        val kids = dir.listFiles() ?: emptyArray()
+        val kids = dir.listFiles()?.filterNot { it.name.startsWith(UPLOAD_PREFIX) } ?: emptyList() // uploads in progress
         val entries = kids.map { Entry(it.name, it.isDirectory, if (it.isFile) it.length() else 0L, it.lastModified()) }
             .sortedWith(compareByDescending<Entry> { it.dir }.thenBy { it.name.lowercase() })
         return Listing(path = normalize(rel), entries = entries)
@@ -94,25 +99,40 @@ class Browser {
     fun filesUnder(rel: String): Pair<File, Sequence<Pair<String, File>>>? {
         val base = rootDir ?: return null
         val dir = resolve(rel)?.takeIf { it.isDirectory } ?: return null
-        fun inside(f: File) = f.path == base.path || f.path.startsWith(base.path + File.separator)
         val seen = HashSet<String>()
         val files = dir.walkTopDown()
-            .onEnter { d -> d.canonicalFile.let { inside(it) && seen.add(it.path) } }
-            .filter { it.isFile && inside(it.canonicalFile) }
+            .onEnter { d -> d.canonicalFile.let { base.holds(it) && seen.add(it.path) } }
+            .filter { it.isFile && base.holds(it.canonicalFile) }
             .map { it.relativeTo(dir).invariantSeparatorsPath to it }
         return dir to files
     }
 
-    /** Save [input] as [name] inside directory [rel]. Returns false if not writable / bad path. */
+    /**
+     * Save [input] as [name] inside directory [rel]. Never replaces a host file: a taken name gets
+     * " (2)", " (3)"…, and the bytes land under the final name only once complete, so a cut-off
+     * upload leaves nothing behind. Returns false if not writable / bad path.
+     */
     fun upload(rel: String, name: String, input: InputStream): Boolean {
-        val base = rootDir ?: return false
-        if (!writeEnabled) return false
+        if (rootDir == null || !writeEnabled) return false
         val dir = resolve(rel)?.takeIf { it.isDirectory } ?: return false
-        val safe = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "file" }
-        val target = File(dir, safe).canonicalFile
-        if (!target.path.startsWith(base.path + File.separator)) return false
-        target.outputStream().use { input.copyTo(it) }
-        return true
+        val safe = name.substringAfterLast('/').substringAfterLast('\\').trim()
+            .takeUnless { it.isEmpty() || it == "." || it == ".." } ?: "file"
+        val tmp = File.createTempFile(UPLOAD_PREFIX, ".part", dir)
+        try {
+            tmp.outputStream().use { input.copyTo(it) }
+            var n = 1
+            while (true) {
+                val target = File(dir, if (n == 1) safe else numberedName(safe, n))
+                try {
+                    Files.move(tmp.toPath(), target.toPath()) // no REPLACE_EXISTING: fails rather than overwrite
+                    return true
+                } catch (_: FileAlreadyExistsException) {
+                    n++
+                }
+            }
+        } finally {
+            tmp.delete() // only still there if the upload failed
+        }
     }
 
     /** Host-only folder picker: directories under [path] (drive/filesystem roots if blank). */
@@ -129,4 +149,12 @@ class Browser {
     }
 
     private fun normalize(rel: String): String = rel.trim().trim('/', '\\').replace('\\', '/')
+}
+
+private const val UPLOAD_PREFIX = ".servd-upload-"
+
+/** "name (n).ext" for [name], which may be a path ("photos/a.jpg"); only the last segment's extension counts. */
+internal fun numberedName(name: String, n: Int): String {
+    val dot = name.lastIndexOf('.').takeIf { it > name.lastIndexOf('/') + 1 } ?: name.length
+    return name.substring(0, dot) + " ($n)" + name.substring(dot)
 }

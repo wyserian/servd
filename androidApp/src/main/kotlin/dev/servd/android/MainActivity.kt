@@ -330,8 +330,9 @@ class MainActivity : Activity() {
     }
 
     private fun openDashboard() {
-        val url = ServdHost.info?.adminUrl ?: return
-        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$url/"))) }
+        val info = ServdHost.info ?: return
+        // The token makes this browser the host; the hub swaps it for a cookie and drops it from the URL.
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${info.adminUrl}/?admin=${info.adminToken}"))) }
             .onFailure { Toast.makeText(this, "No browser to open the dashboard", Toast.LENGTH_SHORT).show() }
     }
 

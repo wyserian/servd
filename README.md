@@ -90,7 +90,7 @@ On start, servd prints:
 ```
 servd v1.7.0 - your device, as a local-network hub
 
-admin   : https://127.0.0.1:8443   (this machine only)
+admin   : https://127.0.0.1:8443/?admin=…   (this machine only - keep the link private)
 serving : https://10.205.210.12:8443   (share with other devices)
 by name : https://servd.local:8443   (iPhone, Mac, Windows, Linux - Android may need the IP)
 cert    : self-signed, SHA-256 fingerprint:
@@ -98,8 +98,9 @@ cert    : self-signed, SHA-256 fingerprint:
 keystore: C:\Users\you\.servd\keystore.jks
 ```
 
-The **admin** URL is the host's own view, where the host-only tabs and settings appear. The
-**serving** URL is the one you share.
+The **admin** URL is the host's own view, where the host-only tabs and settings appear. servd opens
+it for you; the browser keeps the host role after that, so plain `https://127.0.0.1:8443` works too.
+The **serving** URL is the one you share.
 
 1. Put the other devices on the **same Wi-Fi**, or on the host's **hotspot**.
 2. On each device, open **`https://<serving-address>:8443`**, or scan the QR code in the dashboard.
@@ -261,7 +262,11 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
   are rate-limited per device. It's a 4-8 digit PIN against casual access on shared networks, not a
   strong password.
 - **Admin routes** (`/admin/*`: service toggles, join PIN, storage limits, folder and proxy setup)
-  answer only on **loopback**. Only the host device can change settings.
+  and the host-only stream actions need **loopback plus an admin token**. The app and CLI open the
+  dashboard with the token (`/?admin=…`), and the hub swaps it for a cookie (`Secure`, `HttpOnly`,
+  `SameSite=Strict`). Loopback alone isn't enough: websites open in the host's browser and other
+  apps on a phone also connect from 127.0.0.1. The token lives in the data folder (`admin.token`);
+  delete it to sign every host browser out.
 - **Drop files** can't fill the host's disk: uploads stop at the free-space floor (1 GB or 5%),
   plus the host's optional quota. Limits are counted as bytes arrive, not from the size a client
   claims.
@@ -272,7 +277,8 @@ servd is built for a **trusted LAN**, and these limits are deliberate:
 - **SSH/FTP** always require the password; there's no anonymous login. FTP uses explicit TLS
   (FTPS), and SFTP is encrypted by design. Both are limited to the shared files, with no OS shell.
 - **Browse files** is off by default and set up only from the host. Clients can't go above the
-  chosen folder, and uploads are refused unless the host allows them.
+  chosen folder, and uploads are refused unless the host allows them. An upload never replaces a
+  host file (a taken name gets " (2)"), and a cut-off upload leaves nothing behind.
 - **Live streams** use the browser's WebRTC encryption (DTLS-SRTP) between the two devices. The hub
   only relays setup messages, and only between a stream's owner and its current viewers, so the
   join PIN covers who can watch.
@@ -329,10 +335,10 @@ servd/
   | Chat | WebSocket `/ws`: announce a name, then chat |
   | Live streams | over `/ws`: `liveStart` / `liveStop` / `liveWatch` / `liveLeave`, and `signal` messages relayed between a streamer and its viewers (`LiveRegistry`) |
   | Watch together | over `/ws`: `mediaPlay` / `mediaState` / `mediaStop` from the host (`Playback`); everyone gets `mediaSession` and streams `GET /files/{id}` |
-  | Drop files | `POST /files` upload (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
-  | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload` when writable |
+  | Drop files | `POST /files?name=&from=&device=` upload, the body is the file (folder files add `path` + `batch`; 413 when full) · `GET /files` list · `GET /files/{id}` · `GET /files/zip` (`?batch=` for one folder) · `GET /files/usage` · `DELETE /files/batch/{batch}` · delete/clear |
+  | Browse files | `GET /fs/list`, `/fs/file`, `/fs/zip` · `POST /fs/upload?path=&name=` (body is the file) when writable |
   | Serve site | a separate HTTPS listener on its own port, forwarding requests and WebSocket upgrades |
-  | Admin (loopback only) | `/admin/*`, incl. `/admin/pin`, `/admin/storage`, `/admin/browse*` and `/admin/proxy` |
+  | Admin (loopback + admin token) | `/admin/*`, incl. `/admin/pin`, `/admin/storage`, `/admin/browse*` and `/admin/proxy` |
 
 - **Out of scope**: Bluetooth (Wi-Fi/hotspot only), a native Compose UI, end-to-end encryption,
   scanning the whole LAN (the roster is the hub's peers plus mDNS hub discovery), and an external

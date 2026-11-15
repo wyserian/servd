@@ -206,7 +206,6 @@
   .composer textarea::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
   .composer textarea::-webkit-scrollbar-track { background: transparent; }
   .send { width: 32px; height: 32px; flex-shrink: 0; background: var(--accent); color: #04150F; border: 0; border-radius: 8px; padding: 0; cursor: pointer; display: inline-grid; place-items: center; }
-  .send:disabled { opacity: .45; cursor: default; }
   .send:hover { filter: brightness(1.05); }
   .send:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -877,9 +876,11 @@
     return null;
   }
   function fileUrl(f){ return "/files/"+encodeURIComponent(f.id); }
+  // Shared from this device: by device id (two devices can share a name); older files only have the name.
+  function isMine(f){ return f.fromId ? f.fromId===myPeerId : f.fromName===userName; }
   function imgThumb(f){ return '<button type="button" class="media-img" data-open="'+esc(f.id)+'" title="View"><img loading="lazy" alt="'+esc(f.name)+'" src="'+fileUrl(f)+'"></button>'; }
   function addFileMsg(f){
-    const stick=atBottom(); const mine=f.fromName===userName;
+    const stick=atBottom(); const mine=isMine(f);
     const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
     const who = mine ? "you" : esc(f.fromName);
     const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
@@ -927,7 +928,7 @@
   function addFolderMsg(f){
     let m=folderMsgs.get(f.batch);
     if(!m){
-      const stick=atBottom(); const mine=f.fromName===userName;
+      const stick=atBottom(); const mine=isMine(f);
       const el=document.createElement("div"); el.className="msg"+(mine?" me":"");
       const who = mine ? "you" : esc(f.fromName);
       const col = mine ? "var(--accent-ink)" : colorFor(f.fromName);
@@ -1034,7 +1035,7 @@
     const isNew=!files.has(f.id); files.set(f.id,f); scheduleRender();
     if(isNew&&announce){
       if(f.batch) addFolderMsg(f); // alerts once, when the folder's first file arrives
-      else { addFileMsg(f); if(f.fromName!==userName) noteActivity(f.fromName, "shared "+f.name+" ("+fmtSize(f.size)+")", "files"); }
+      else { addFileMsg(f); if(!isMine(f)) noteActivity(f.fromName, "shared "+f.name+" ("+fmtSize(f.size)+")", "files"); }
     }
   }
   function loadFiles(){ fetch("/files").then(r=>r.json()).then(list=>{ list.forEach(f=>files.set(f.id,f)); renderFiles(); }).catch(()=>{}); }
@@ -1097,6 +1098,8 @@
   }
   function newBatchId(){ const a=new Uint8Array(12); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 
+  // An upload's body is the file itself; who sent it (and a dropped folder's path/batch) ride in the query.
+  function uploadUrl(file, extra){ return "/files?"+new URLSearchParams({name:file.name, from:userName, device:DEVICE_ID, ...extra}); }
   function startUpload(items, folderName){ // items: [{file, path}]
     const id="up-"+(upSeq++), batch = folderName ? newBatchId() : null;
     uploads.set(id,{ name: folderName || items[0].file.name, folder: !!folderName,
@@ -1132,10 +1135,7 @@
     });
     xhr.addEventListener("error",()=>{ u.failed.push(t.path||t.file.name); done(false); });
     xhr.addEventListener("abort",()=>done(false));
-    const fd=new FormData(); fd.append("from",userName);
-    if(t.batch){ fd.append("path",t.path); fd.append("batch",t.batch); } // before the file: the server reads parts in order
-    fd.append("file",t.file,t.file.name);
-    xhr.open("POST","/files"); xhr.send(fd);
+    xhr.open("POST", uploadUrl(t.file, t.batch ? {path:t.path, batch:t.batch} : {})); xhr.send(t.file);
   }
   // Drop the row's queued files and abort its in-flight ones (except [keep], already finished).
   function stopRow(id,u,keep){
@@ -1346,8 +1346,7 @@
   function browseUpload(fileList){
     let pending=fileList.length;
     for(const file of fileList){
-      const fd=new FormData(); fd.append("file",file,file.name);
-      fetch("/fs/upload?path="+encodeURIComponent(brCur),{method:"POST",body:fd})
+      fetch("/fs/upload?"+new URLSearchParams({path:brCur, name:file.name}),{method:"POST",body:file})
         .then(r=>{ if(!r.ok) addSys("upload failed: "+file.name); })
         .catch(()=>addSys("upload failed: "+file.name))
         .finally(()=>{ if(--pending===0) openBrowse(brCur); });
@@ -1876,8 +1875,7 @@
   $("playInput").addEventListener("change", ()=>{
     const fi=$("playInput"), file=fi.files[0]; fi.value=""; if(!file) return;
     const b=$("playUpload"); b.disabled=true; b.textContent="uploading…"; liveErr("");
-    const fd=new FormData(); fd.append("from", userName); fd.append("file", file, file.name);
-    fetch("/files", {method:"POST", body:fd})
+    fetch(uploadUrl(file, {}), {method:"POST", body:file})
       .then(r=>r.json().then(j=>{ if(!r.ok) throw r.status; return j; }))
       .then(saved=>{ if(saved[0]) playForEveryone(saved[0].id); })
       .catch(st=>liveErr(st===413 ? "Not enough space on the hub for that file." : "Couldn't upload that file."))
@@ -1907,12 +1905,12 @@
         case "welcome": selfId=m.selfId; myPeerId=m.peerId||null; break;
         case "roster": renderRoster(m.peers); break;
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); if(m.fromId!==selfId) noteActivity(m.fromName, m.text.length>140 ? m.text.slice(0,140)+"…" : m.text, "chat"); break;
-        case "presence": addSys(esc(m.peer.name)+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
+        case "presence": addSys(m.peer.name+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;
         case "file": addFile(m.file,true); scheduleUsage(); break;
-        case "chatCleared": log.innerHTML=""; folderMsgs.clear(); addSys("chat cleared by "+esc(m.byName)); break;
+        case "chatCleared": log.innerHTML=""; folderMsgs.clear(); addSys("chat cleared by "+m.byName); break;
         case "fileRemoved": files.delete(m.id); scheduleRender(); scheduleUsage(); break;
         case "filesRemoved": m.ids.forEach(id=>files.delete(id)); scheduleRender(); scheduleUsage(); break;
-        case "filesCleared": files.clear(); scheduleRender(); scheduleUsage(); addSys("files cleared by "+esc(m.byName)); break;
+        case "filesCleared": files.clear(); scheduleRender(); scheduleUsage(); addSys("files cleared by "+m.byName); break;
         case "liveList": renderLive(m); break;
         case "liveViewer": onViewer(m); break;
         case "liveFull": endWatch("That stream is full ("+$("liveMax").textContent+" viewers)."); break;

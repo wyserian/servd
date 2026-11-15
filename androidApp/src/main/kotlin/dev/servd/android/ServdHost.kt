@@ -39,6 +39,8 @@ object ServdHost {
         val sshPort: Int,
         val ftpPort: Int,
         val onLan: Boolean,
+        /** Opens [adminUrl] as the host (see [dev.servd.core.service.ServdCredentials.loadOrCreateAdminToken]). */
+        val adminToken: String,
         /** e.g. https://servd.local:8443, once the .local name is claimed; null if unavailable. */
         val localUrl: String? = null,
     )
@@ -70,6 +72,8 @@ object ServdHost {
         // An existing keystore is reused as-is (stable fingerprint); a new one also lists servd.local.
         val tls = ServdCertificates.loadOrCreate(dataDir, listOfNotNull("127.0.0.1", lan?.ip, "${LocalName.DEFAULT}.local"))
         val password = ServdCredentials.loadOrCreatePassword(dataDir)
+        // Other apps on the phone also reach 127.0.0.1; only this app's link carries the token.
+        val adminToken = ServdCredentials.loadOrCreateAdminToken(dataDir)
         val ssh = SshService(
             port = SSH_PORT,
             filesDir = filesDir,
@@ -91,6 +95,7 @@ object ServdHost {
             pickerRoots = storagePickerRoots(),
             pinFile = File(dataDir, "join.pin"),
             limitsFile = File(dataDir, "storage.properties"),
+            adminToken = adminToken,
         )
         srv.start(wait = false)
         server = srv
@@ -103,6 +108,7 @@ object ServdHost {
             sshPort = SSH_PORT,
             ftpPort = FTP_PORT,
             onLan = lan != null,
+            adminToken = adminToken,
         )
 
         if (lan != null) {
@@ -149,12 +155,10 @@ object ServdHost {
                 serviceName = "servd@${deviceName()}"
                 serviceType = "_servd._tcp."
                 port = PORT
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    setAttribute("version", Servd.VERSION)
-                    setAttribute("fingerprint", fingerprint)
-                    setAttribute("https", "true")
-                    setAttribute("path", "/")
-                }
+                setAttribute("version", Servd.VERSION)
+                setAttribute("fingerprint", fingerprint)
+                setAttribute("https", "true")
+                setAttribute("path", "/")
             }
             val listener = object : NsdManager.RegistrationListener {
                 override fun onServiceRegistered(info: NsdServiceInfo) {

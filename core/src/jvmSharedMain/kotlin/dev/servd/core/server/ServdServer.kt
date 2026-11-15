@@ -3,11 +3,15 @@ package dev.servd.core.server
 import dev.servd.core.Servd
 import dev.servd.core.auth.JoinPin
 import dev.servd.core.browse.Browser
+import dev.servd.core.browse.numberedName
+import dev.servd.core.chat.peerIdFor
+import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.respondRedirect
+import java.security.MessageDigest
 import dev.servd.core.proxy.WebProxy
 import dev.servd.core.chat.ChatHub
 import dev.servd.core.chat.ChatSend
 import dev.servd.core.chat.ClearChat
-import dev.servd.core.chat.FileMeta
 import dev.servd.core.chat.Hello
 import dev.servd.core.chat.LiveLeave
 import dev.servd.core.chat.LiveStart
@@ -36,8 +40,6 @@ import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.PartData
-import io.ktor.http.content.forEachPart
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.engine.ApplicationEngine
@@ -48,7 +50,6 @@ import io.ktor.server.engine.sslConnector
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.contentLength
 import io.ktor.server.request.path
-import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
@@ -118,6 +119,8 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     pinFile: File? = null,
     /** Where the drop-files limits (quota, auto-clear) are persisted; null keeps them in memory only. */
     limitsFile: File? = null,
+    /** Secret the host's dashboard must present for the admin API (see [ServdCredentials.loadOrCreateAdminToken]). */
+    private val adminToken: String,
 ) {
     val url: String get() = "https://$advertisedHost:$port"
 
@@ -179,8 +182,16 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
     private fun ApplicationCall.mayUseHub(): Boolean =
         isLoopbackClient() || joinPin.allows(request.cookies[JoinPin.COOKIE])
 
+    /** The host's own dashboard: on loopback AND holding the admin token (its SameSite=Strict cookie). */
+    private fun ApplicationCall.isHost(): Boolean =
+        isLoopbackClient() && MessageDigest.isEqual(
+            request.cookies[ADMIN_COOKIE].orEmpty().toByteArray(), adminToken.toByteArray(),
+        )
+
     private fun Application.servdModule() {
-        install(WebSockets)
+        // Chat and WebRTC setup messages are small; without a cap one device could make the hub
+        // buffer a multi-GB frame and run out of memory.
+        install(WebSockets) { maxFrameSize = MAX_WS_FRAME }
         install(PartialContent) // Range requests: video previews can seek
         // Auto-clear sweep (a no-op while auto-clear is off). Stops with the server.
         launch {
@@ -189,11 +200,15 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 runCatching { expireFiles() }
             }
         }
-        // Join PIN gate: while a PIN is set, everything except the page itself and the PIN check
-        // needs a session - including the chat socket, files, browse, QR and status.
+        // One gate for every request: the admin API needs the host, and while a PIN is set
+        // everything except the page itself and the PIN check needs a session.
         intercept(ApplicationCallPipeline.Plugins) {
-            if (call.request.path() !in PIN_OPEN_PATHS && !call.mayUseHub()) {
-                call.respond(HttpStatusCode.Unauthorized)
+            val denied = accessDenied(
+                call.request.path(), call.isLoopbackClient(),
+                session = joinPin.allows(call.request.cookies[JoinPin.COOKIE]), host = call.isHost(),
+            )
+            if (denied != null) {
+                call.respond(denied)
                 finish()
             }
         }
@@ -226,6 +241,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             // Real-time chat + presence. Clients connect, say hello (name), then exchange chat.
             webSocket("/ws") {
                 val address = call.request.origin.remoteAddress // raw IP, no reverse-DNS
+                val host = call.isHost()
                 val id = chatHub.onConnect(this, address)
                 try {
                     for (frame in incoming) {
@@ -235,19 +251,19 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                                 is ChatSend -> chatHub.onChat(id, msg.text)
                                 is ClearChat -> chatHub.onClearChat(id)
                                 // Only the host goes live; other devices can only watch.
-                                is LiveStart -> if (isLoopback(address)) chatHub.onLiveStart(id, msg.kind)
+                                is LiveStart -> if (host) chatHub.onLiveStart(id, msg.kind)
                                 is LiveStop -> chatHub.onLiveStop(id)
                                 is LiveWatch -> chatHub.onLiveWatch(id, msg.id)
                                 is LiveLeave -> chatHub.onLiveLeave(id, msg.id)
                                 is SignalSend -> chatHub.onSignal(id, msg)
                                 // Playing a shared video/audio file for everyone: host only, too.
-                                is MediaPlay -> if (isLoopback(address)) {
+                                is MediaPlay -> if (host) {
                                     fileStore.get(msg.fileId)?.first?.let { meta ->
                                         val kind = MediaTypes.forFile(meta.name, meta.contentType).substringBefore('/')
                                         if (kind == "video" || kind == "audio") chatHub.onMediaPlay(id, meta.id, "/files/${meta.id}", meta.name, kind)
                                     }
                                 }
-                                is MediaPlayUrl -> if (isLoopback(address)) {
+                                is MediaPlayUrl -> if (host) {
                                     MediaLink.parse(msg.url)?.let { chatHub.onMediaPlay(id, null, it.src, it.name, it.kind) }
                                 }
                                 is MediaState -> chatHub.onMediaState(id, msg.playing, msg.position, msg.sync)
@@ -284,50 +300,33 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             get("/qr") {
                 call.respondText(Qr.svg("$url/"), ContentType("image", "svg+xml"))
             }
-            // File sharing: upload (multipart), list (newest first), download (by id).
+            // File sharing: upload, list (newest first), download (by id).
+            // Upload: the body is the file itself, streamed to disk; its details ride in the query
+            // (?name=&from=&device=, plus &path=&batch= for a dropped folder's files). Not multipart:
+            // Ktor reads multipart text fields whole into memory, under the same limit as the file.
             post("/files") {
-                // Refuse up front when the declared body can't fit (a little slack for multipart
-                // framing). The store also enforces the limits while streaming, since the
-                // declared size can't be trusted.
+                // Refuse up front when the declared body can't fit. The store also enforces the
+                // limits while streaming, since the declared size can't be trusted.
                 val declared = call.request.contentLength()
-                if (declared != null && declared > fileStore.room() + 64 * 1024) {
+                if (declared != null && declared > fileStore.room()) {
                     return@post call.respondText(
                         json.encodeToString(fileStore.usage()), ContentType.Application.Json, HttpStatusCode.PayloadTooLarge,
                     )
                 }
-                // Ktor caps multipart parts at ~50 MB by default, which silently 500s bigger uploads.
-                // File parts are streamed straight to disk below, so lift the cap well up (5 GB).
-                val multipart = call.receiveMultipart(formFieldLimit = 5L * 1024 * 1024 * 1024)
-                var from = "someone"
-                var path: String? = null  // set for files of a dropped folder (fields precede the file)
-                var batch: String? = null
-                val saved = mutableListOf<FileMeta>()
-                try {
-                    multipart.forEachPart { part ->
-                        try {
-                            when (part) {
-                                is PartData.FormItem -> when (part.name) {
-                                    "from" -> from = part.value.take(40).ifBlank { "someone" }
-                                    "path" -> path = part.value.take(2000)
-                                    "batch" -> batch = part.value.take(64)
-                                }
-                                is PartData.FileItem -> {
-                                    val name = part.originalFileName ?: "file"
-                                    val contentType = part.contentType?.toString()
-                                    // Blocking stream + disk writes: off the request threads, or a few
-                                    // slow uploads would stall every other request until they finish.
-                                    val meta = withContext(Dispatchers.IO) {
-                                        part.provider().toInputStream().use {
-                                            fileStore.save(name, contentType, from, it, path, batch)
-                                        }
-                                    }
-                                    chatHub.announceFile(meta)
-                                    saved += meta
-                                }
-                                else -> {}
-                            }
-                        } finally {
-                            part.release()
+                val q = call.request.queryParameters
+                val from = q["from"]?.take(40)?.ifBlank { null } ?: "someone"
+                // The uploader's device, as the roster knows it, so each dashboard can tell its own files.
+                val fromId = q["device"]?.let { peerIdFor("", it, call.request.origin.remoteAddress) }?.ifEmpty { null }
+                val body = call.receiveChannel()
+                val meta = try {
+                    // Blocking stream + disk writes: off the request threads, or a few slow uploads
+                    // would stall every other request until they finish.
+                    withContext(Dispatchers.IO) {
+                        body.toInputStream().use {
+                            fileStore.save(
+                                q["name"] ?: "file", call.request.headers[HttpHeaders.ContentType], from, it,
+                                q["path"]?.take(2000), q["batch"]?.take(64), fromId,
+                            )
                         }
                     }
                 } catch (e: FileStore.StorageFullException) {
@@ -335,7 +334,8 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                         json.encodeToString(e.usage), ContentType.Application.Json, HttpStatusCode.PayloadTooLarge,
                     )
                 }
-                call.respondText(json.encodeToString(saved), ContentType.Application.Json)
+                chatHub.announceFile(meta)
+                call.respondText(json.encodeToString(listOf(meta)), ContentType.Application.Json)
             }
             get("/files") {
                 call.respondText(json.encodeToString(fileStore.list()), ContentType.Application.Json)
@@ -438,21 +438,14 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 )
                 call.respondOutputStream(ContentType.Application.Zip) { writeZip(files) }
             }
+            // Upload one file into a browse folder: the body is the file (?path=folder&name=file).
             post("/fs/upload") {
                 if (!browser.enabled) return@post call.respond(HttpStatusCode.NotFound)
                 if (!browser.writable) return@post call.respond(HttpStatusCode.Forbidden)
-                val dir = call.request.queryParameters["path"] ?: ""
-                val multipart = call.receiveMultipart(formFieldLimit = 5L * 1024 * 1024 * 1024)
-                var ok = false
-                multipart.forEachPart { part ->
-                    if (part is PartData.FileItem) {
-                        val name = part.originalFileName ?: "file"
-                        val saved = withContext(Dispatchers.IO) { // blocking, see POST /files
-                            part.provider().toInputStream().use { browser.upload(dir, name, it) }
-                        }
-                        ok = saved || ok
-                    }
-                    part.release()
+                val q = call.request.queryParameters
+                val body = call.receiveChannel()
+                val ok = withContext(Dispatchers.IO) { // blocking, see POST /files
+                    body.toInputStream().use { browser.upload(q["path"] ?: "", q["name"] ?: "file", it) }
                 }
                 call.respond(if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest)
             }
@@ -460,11 +453,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             // Host-only admin API: reachable from loopback (the host machine) only, so LAN
             // devices can use the dashboard but cannot reconfigure the server.
             get("/admin/browse") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(json.encodeToString(browser.config()), ContentType.Application.Json)
             }
             post("/admin/browse") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val p = call.request.queryParameters
                 val enable = p["enabled"]?.toBoolean() ?: false
                 val writable = p["writable"]?.toBoolean() ?: false
@@ -479,7 +470,6 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 )
             }
             get("/admin/browse/dirs") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(
                     json.encodeToString(browser.serverDirs(call.request.queryParameters["path"])),
                     ContentType.Application.Json,
@@ -487,11 +477,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
             // Join PIN, host-only. Setting, changing or clearing it signs every other device out.
             get("/admin/pin") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(pinConfig(), ContentType.Application.Json)
             }
             post("/admin/pin") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val pin = call.receiveParameters()["pin"]?.trim().orEmpty().ifEmpty { null }
                 if (pin != null && !JoinPin.isValid(pin)) {
                     return@post call.respondText(pinConfig(), ContentType.Application.Json, HttpStatusCode.BadRequest)
@@ -502,11 +490,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
             // Drop-files limits, host-only: optional quota (bytes) and auto-clear age (hours).
             get("/admin/storage") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(json.encodeToString(fileStore.usage()), ContentType.Application.Json)
             }
             post("/admin/storage") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val p = call.receiveParameters()
                 val ok = runCatching {
                     val maxBytes = p["maxBytes"]?.trim().orEmpty().ifEmpty { null }?.toLong()
@@ -522,17 +508,14 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             }
             // Reverse proxy (re-serve a host-run web app to the LAN), host-only.
             get("/admin/proxy") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(json.encodeToString(webProxy.config()), ContentType.Application.Json)
             }
             // Scan-to-open QR of the served site's URL (404 while nothing is served).
             get("/admin/proxy/qr") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 val siteUrl = webProxy.config().url ?: return@get call.respond(HttpStatusCode.NotFound)
                 call.respondText(Qr.svg("$siteUrl/"), ContentType("image", "svg+xml"))
             }
             post("/admin/proxy") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val p = call.request.queryParameters
                 val enable = p["enabled"]?.toBoolean() ?: false
                 val target = p["target"]
@@ -547,11 +530,9 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 )
             }
             get("/admin/services") {
-                if (!call.isLoopbackClient()) return@get call.respond(HttpStatusCode.Forbidden)
                 call.respondText(json.encodeToString(serviceManager.list()), ContentType.Application.Json)
             }
             post("/admin/services/{id}/start") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val ok = call.parameters["id"]?.let { serviceManager.start(it) } ?: false
                 call.respondText(
                     json.encodeToString(serviceManager.list()),
@@ -560,7 +541,6 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                 )
             }
             post("/admin/services/{id}/stop") {
-                if (!call.isLoopbackClient()) return@post call.respond(HttpStatusCode.Forbidden)
                 val ok = call.parameters["id"]?.let { serviceManager.stop(it) } ?: false
                 call.respondText(
                     json.encodeToString(serviceManager.list()),
@@ -571,6 +551,18 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
             // The served dashboard (single page). Read the one resource by name via the
             // classloader - Ktor's directory-style staticResources does not resolve on Android.
             get("/") {
+                // The app/CLI opens the host's dashboard as /?admin=<token>: keep the token as a
+                // cookie (HttpOnly, never sent cross-site) and drop it from the address bar.
+                val token = call.request.queryParameters["admin"]
+                if (token != null) {
+                    if (call.isLoopbackClient() && MessageDigest.isEqual(token.toByteArray(), adminToken.toByteArray())) {
+                        call.response.header( // by hand, like the PIN cookie
+                            HttpHeaders.SetCookie,
+                            "$ADMIN_COOKIE=$adminToken; Max-Age=${400 * 24 * 3600}; Path=/; Secure; HttpOnly; SameSite=Strict",
+                        )
+                    }
+                    return@get call.respondRedirect("/")
+                }
                 val html = indexHtml
                 if (html != null) call.respondBytes(html, ContentType.Text.Html)
                 else call.respond(HttpStatusCode.NotFound)
@@ -589,6 +581,20 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
 
 /** Reachable without a session while a join PIN is set: the page (it shows the PIN screen) and the check. */
 private val PIN_OPEN_PATHS = setOf("/", "/auth")
+
+private const val ADMIN_COOKIE = "servd_admin"
+private const val MAX_WS_FRAME = 1L shl 20 // 1 MB
+
+/**
+ * Who may reach [path]; null = go ahead, else the status to refuse with. The admin API needs the
+ * [host] (loopback plus the admin token). Everything else needs this machine ([loopback]) or a
+ * PIN [session] (always true while no PIN is set), except the page and the PIN check.
+ */
+internal fun accessDenied(path: String, loopback: Boolean, session: Boolean, host: Boolean): HttpStatusCode? = when {
+    (path == "/admin" || path.startsWith("/admin/")) && !host -> HttpStatusCode.Forbidden
+    path !in PIN_OPEN_PATHS && !loopback && !session -> HttpStatusCode.Unauthorized
+    else -> null
+}
 
 /**
  * Stream [entries] (zip path to file) as one zip. Unreadable files are skipped rather than failing
@@ -635,11 +641,7 @@ private fun isCompressed(path: String): Boolean =
 private fun uniqueName(name: String, used: MutableSet<String>): String {
     var candidate = name
     var n = 2
-    while (!used.add(candidate.lowercase())) {
-        val dot = name.lastIndexOf('.').takeIf { it > name.lastIndexOf('/') + 1 } ?: name.length
-        candidate = name.substring(0, dot) + " ($n)" + name.substring(dot)
-        n++
-    }
+    while (!used.add(candidate.lowercase())) candidate = numberedName(name, n++)
     return candidate
 }
 
