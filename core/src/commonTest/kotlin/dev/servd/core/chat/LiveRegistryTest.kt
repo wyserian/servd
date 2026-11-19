@@ -23,7 +23,11 @@ class LiveRegistryTest {
         assertFalse(r.start("alice", "screen"), "already live")
         assertFalse(r.start("bob", "hologram"))
         assertTrue(r.start("bob", "audio"))
-        assertEquals(listOf("alice" to "camera", "bob" to "audio"), r.snapshot { it }.map { it.ownerId to it.kind })
+        assertTrue(r.start("carol", "sound"), "the host computer's sound output")
+        assertEquals(
+            listOf("alice" to "camera", "bob" to "audio", "carol" to "sound"),
+            r.snapshot { it }.map { it.ownerId to it.kind },
+        )
     }
 
     @Test

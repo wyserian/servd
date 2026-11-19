@@ -71,6 +71,6 @@ class LiveRegistry(private val newId: () -> String, val maxViewers: Int = MAX_VI
 
     companion object {
         const val MAX_VIEWERS = 10
-        val KINDS = setOf("camera", "screen", "audio")
+        val KINDS = setOf("camera", "screen", "audio", "sound") // sound: what the host computer is playing
     }
 }
