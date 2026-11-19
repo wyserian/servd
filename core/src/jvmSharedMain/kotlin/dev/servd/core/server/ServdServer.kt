@@ -12,6 +12,7 @@ import dev.servd.core.proxy.WebProxy
 import dev.servd.core.chat.ChatHub
 import dev.servd.core.chat.ChatSend
 import dev.servd.core.chat.ClearChat
+import dev.servd.core.chat.Ping
 import dev.servd.core.chat.Hello
 import dev.servd.core.chat.LiveLeave
 import dev.servd.core.chat.LiveStart
@@ -247,6 +248,7 @@ class ServdServer<TEngine : ApplicationEngine, TConfiguration : ApplicationEngin
                                 is Hello -> chatHub.onHello(id, msg.name, msg.deviceId)
                                 is ChatSend -> chatHub.onChat(id, msg.text)
                                 is ClearChat -> chatHub.onClearChat(id)
+                                is Ping -> chatHub.onPing(id, msg.t)
                                 // Only the host goes live; other devices can only watch.
                                 is LiveStart -> if (host) chatHub.onLiveStart(id, msg.kind)
                                 is LiveStop -> chatHub.onLiveStop(id)

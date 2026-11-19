@@ -1711,8 +1711,8 @@
   // ---- play a shared file for everyone ----
   // Every device streams the file from the hub (/files/{id}). With sync on, the host's player is
   // the reference: it reports play/pause/seek (and a heartbeat), the hub forwards it, and viewers
-  // follow within half a second. A viewer who pauses or seeks themselves stops following until
-  // they press resync.
+  // follow it closely (see applyRemote). A viewer who pauses or seeks themselves stops following
+  // until they press resync.
   const PLAYICON='<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   let np=null; // {info, el, recvAt, owner, joined, diverged, applying, timer}
   function mediaKindOf(f){ const k=previewKind(f); return k==="video"||k==="audio" ? k : null; }
@@ -1725,16 +1725,26 @@
     if(media.some(f=>f.id===cur)) sel.value=cur;
     $("playShared").disabled=!media.length;
   }
-  function npTarget(){ const i=np.info; return i.position + (i.playing ? (i.ageMs + performance.now() - np.recvAt)/1000 : 0); }
+  // Where the host's player is right now: its last report, aged by how long ago the hub stamped it,
+  // how long it took to reach us (half our round trip) and how long we've held it since.
+  function npTarget(){ const i=np.info; return i.position + (i.playing ? (i.ageMs + performance.now() - np.recvAt)/1000 + oneWayS() : 0); }
   function sendMediaState(){ if(np && np.owner) wsSend({type:"mediaState", playing:!np.el.paused, position:np.el.currentTime, sync:$("npSync").checked}); }
+  // Follow the host (runs on every report and twice a second): jump only when far off; for small gaps,
+  // play a touch faster or slower (up to 5%, inaudible) until caught up, so there's no stutter.
+  // YouTube's player only changes speed in coarse steps, so it can only jump, from a looser 0.3 s.
   function applyRemote(){
     if(!np || np.owner || !np.joined || np.diverged || !np.info.sync) return;
-    const el=np.el, target=npTarget();
-    np.applying=true;
-    if(Math.abs(el.currentTime-target)>0.5) el.currentTime=target;
-    if(np.info.playing && el.paused) el.play().catch(()=>{ if(np){ np.joined=false; renderNp(); } }); // sound needs a tap
-    if(!np.info.playing && !el.paused) el.pause();
-    clearTimeout(np.applyTimer); np.applyTimer=setTimeout(()=>{ if(np) np.applying=false; }, 400);
+    const el=np.el, target=npTarget(), drift=el.currentTime-target, coarse=!!el.destroy;
+    const ours=fn=>{ np.applying=true; fn(); clearTimeout(np.applyTimer); np.applyTimer=setTimeout(()=>{ if(np) np.applying=false; }, 400); };
+    if(!np.info.playing){
+      if(!el.paused) ours(()=>el.pause());
+      if(Math.abs(drift)>0.05) ours(()=>{ el.currentTime=target; });
+      if(!coarse) el.playbackRate=1;
+      return;
+    }
+    if(el.paused) ours(()=>el.play().catch(()=>{ if(np){ np.joined=false; renderNp(); } })); // sound needs a tap
+    if(Math.abs(drift) > (coarse ? 0.3 : 1)){ ours(()=>{ el.currentTime=target; }); if(!coarse) el.playbackRate=1; }
+    else if(!coarse) el.playbackRate = Math.abs(drift)<0.015 ? 1 : 1 - Math.max(-0.05, Math.min(0.05, drift));
   }
   function teardownNp(){
     if(!np) return;
@@ -1812,7 +1822,7 @@
       el.addEventListener("title", ()=>{ if(np && np.el===el){ np.title=el.title; renderNp(); } }); // YouTube reports its title
       if(owner){
         ["play","pause","seeked","ratechange"].forEach(ev=>el.addEventListener(ev, sendMediaState));
-        np.timer=setInterval(()=>{ if(np && !np.el.paused) sendMediaState(); }, 5000); // heartbeat keeps viewers' drift small
+        np.timer=setInterval(()=>{ if(np && !np.el.paused) sendMediaState(); }, 2000); // heartbeat keeps viewers' drift small
         el.play().catch(()=>{});
       } else {
         // A pause/play/seek the viewer made themselves (not ours from applyRemote) = they've gone their own way.
@@ -1820,6 +1830,7 @@
         el.addEventListener("pause", ()=>{ if(mine() && np.info.playing){ np.diverged=true; renderNp(); } });
         el.addEventListener("play",  ()=>{ if(mine() && !np.info.playing){ np.diverged=true; renderNp(); } });
         el.addEventListener("seeked",()=>{ if(mine() && Math.abs(el.currentTime-npTarget())>2){ np.diverged=true; renderNp(); } });
+        np.timer=setInterval(applyRemote, 500);
         addSys("the host is playing "+info.name+" for everyone");
         noteActivity("host", "is playing "+info.name+" for everyone", "stream");
       }
@@ -1871,9 +1882,15 @@
   $("stopWatch").addEventListener("click", ()=>endWatch());
 
   // ---- websocket ----
+  // Network delay to the hub, for watch-together sync: the fastest of the last few round trips
+  // (slow ones were held up somewhere), halved for the one way the hub's updates travel.
+  let rtts=[];
+  function ping(){ wsSend({type:"ping", t:performance.now()}); }
+  function oneWayS(){ return rtts.length ? Math.min(...rtts)/2000 : 0; }
+  setInterval(ping, 15000);
   function connect(){
     ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
-    ws.onopen=()=>{ setConn(true); sayHello(); loadStatus(); loadBrowseInfo(); };
+    ws.onopen=()=>{ setConn(true); sayHello(); loadStatus(); loadBrowseInfo(); rtts=[]; [0,300,600].forEach(d=>setTimeout(ping,d)); };
     // Reconnect - unless the hub now wants a PIN (it was set or changed), then show the PIN screen.
     ws.onclose=()=>{
       setConn(false); clearTimeout(retry); retry=setTimeout(()=>checkAuth().then(ok=>{ if(ok) connect(); }),1500);
@@ -1887,6 +1904,7 @@
     ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data); }catch{ return; }
       switch(m.type){
         case "welcome": selfId=m.selfId; myPeerId=m.peerId||null; break;
+        case "pong": rtts.push(performance.now()-m.t); if(rtts.length>5) rtts.shift(); break;
         case "roster": renderRoster(m.peers); break;
         case "chat": addChat(m.fromId,m.fromName,m.text,m.ts); if(m.fromId!==selfId) noteActivity(m.fromName, m.text.length>140 ? m.text.slice(0,140)+"…" : m.text, "chat"); break;
         case "presence": addSys(m.peer.name+(m.event==="join"?" joined the hub":" left the hub")); loadStatus(); break;

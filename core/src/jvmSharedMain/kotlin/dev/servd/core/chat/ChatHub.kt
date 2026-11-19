@@ -70,6 +70,8 @@ class ChatHub(private val serverName: String) {
         sendTo(id, mediaSession()) // and what is playing, so a late joiner catches up
     }
 
+    suspend fun onPing(id: String, t: Double) = sendTo(id, Pong(t))
+
     suspend fun onChat(id: String, text: String) {
         val name = conns[id]?.name ?: return // must have said hello first
         val clean = text.trim()

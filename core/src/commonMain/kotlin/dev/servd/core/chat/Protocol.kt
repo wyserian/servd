@@ -31,6 +31,11 @@ data class ChatSend(val text: String) : ClientMessage
 @SerialName("clearChat")
 data object ClearChat : ClientMessage
 
+/** Measures the round trip to the hub (answered with [Pong]); [t] is the sender's own clock, echoed back. */
+@Serializable
+@SerialName("ping")
+data class Ping(val t: Double) : ClientMessage
+
 // ---- Live streams (WebRTC). Media goes peer to peer; the hub only keeps the list of who is live
 // and relays the WebRTC setup messages (SDP offers/answers, ICE candidates) between two peers.
 
@@ -81,6 +86,11 @@ data object MediaStop : ClientMessage
 
 @Serializable
 sealed interface ServerMessage
+
+/** The answer to a [Ping], echoing its time. */
+@Serializable
+@SerialName("pong")
+data class Pong(val t: Double) : ServerMessage
 
 @Serializable
 @SerialName("welcome")

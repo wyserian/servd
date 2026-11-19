@@ -182,8 +182,11 @@ Things to know:
    **join playback** once, because browsers need a tap before playing sound.
 
 How sync works:
-- **On (default):** the host's play, pause and seek apply on every device, within about half a
-  second. A device that joins midway lands at the current spot.
+- **On (default):** the host's play, pause and seek apply on every device. Each device allows for
+  its own network delay and closes small gaps by playing up to 5% faster or slower, so devices stay
+  within a few hundredths of a second of each other (YouTube links: about 0.3 s, since YouTube's
+  player can only jump). Bluetooth speakers and headphones add their own delay, which no browser
+  can see. A device that joins midway lands at the current spot.
 - **Going your own way:** a viewer who pauses or seeks on their own stops following until they
   press **resync**.
 - **Off:** everyone plays at their own pace.
