@@ -169,7 +169,7 @@ class ChatHub(private val serverName: String) {
     suspend fun onLiveWatch(id: String, streamId: String) {
         when (val r = liveLock.withLock { live.watch(streamId, id) }) {
             is LiveRegistry.Watch.Ok -> {
-                sendTo(r.ownerId, LiveViewer(streamId, id, joined = true))
+                sendTo(r.ownerId, LiveViewer(streamId, id, joined = true, name = conns[id]?.name))
                 broadcastLive()
             }
             LiveRegistry.Watch.Full -> sendTo(id, LiveFull(streamId))

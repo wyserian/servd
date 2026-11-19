@@ -599,6 +599,7 @@
 
             <section class="sec" id="myLive" hidden>
               <div class="sec-head"><h3>Your stream</h3><span class="sec-meta live-badge">● live</span><span class="sec-meta" id="myViewers">0 watching</span></div>
+              <p class="sec-desc" id="myWatchers">No one is watching yet.</p>
               <video class="stream-video" id="myPreview" muted playsinline autoplay></video>
               <div class="audio-only" id="myAudioOnly" hidden>microphone only</div>
               <div class="sec-actions"><button class="mini-btn btn-danger" id="stopLive" type="button">stop</button></div>
@@ -1630,17 +1631,23 @@
     $("myPreview").srcObject=myStream; $("myPreview").hidden = audioOnly(kind);
     $("myAudioOnly").hidden = !audioOnly(kind); $("myAudioOnly").textContent = KIND_LABEL[kind]+" only";
     $("myLive").hidden=false; syncLiveUi(); $("myViewers").textContent="0 watching";
+    myWatchers.clear(); renderWatchers();
     wsSend({type:"liveStart", kind});
   }
   function stopLive(local){
     if(!myStream) return;
     if(local!==true) wsSend({type:"liveStop"});
     myStream.getTracks().forEach(t=>t.stop()); myStream=null;
-    for(const pc of myPeers.values()) pc.close(); myPeers.clear();
+    for(const pc of myPeers.values()) pc.close(); myPeers.clear(); myWatchers.clear();
     $("myPreview").srcObject=null; $("myLive").hidden=true; syncLiveUi();
   }
+  // Who is watching my stream, by name (the hub sends the name when someone starts watching).
+  const myWatchers=new Map(); // viewerId -> name
+  function renderWatchers(){ $("myWatchers").textContent = myWatchers.size ? "Watching: "+[...myWatchers.values()].join(", ") : "No one is watching yet."; }
   async function onViewer(m){
     const old=myPeers.get(m.viewerId); if(old){ old.close(); myPeers.delete(m.viewerId); }
+    if(m.joined && myStream) myWatchers.set(m.viewerId, m.name || "someone"); else myWatchers.delete(m.viewerId);
+    renderWatchers();
     if(!m.joined || !myStream) return;
     const pc=new RTCPeerConnection(RTC_CFG); myPeers.set(m.viewerId, pc);
     myStream.getTracks().forEach(t=>pc.addTrack(t, myStream));

@@ -171,7 +171,7 @@ data class LiveList(val streams: List<LiveStream>, val maxViewers: Int) : Server
 /** To a stream's owner: [viewerId] started ([joined]) or stopped watching. */
 @Serializable
 @SerialName("liveViewer")
-data class LiveViewer(val stream: String, val viewerId: String, val joined: Boolean) : ServerMessage
+data class LiveViewer(val stream: String, val viewerId: String, val joined: Boolean, val name: String? = null) : ServerMessage // name: set on join, so the streamer can list who's watching
 
 /** To a would-be viewer: stream [stream] already has the maximum number of viewers. */
 @Serializable
