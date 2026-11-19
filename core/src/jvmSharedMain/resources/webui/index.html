@@ -20,6 +20,8 @@
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
     --r: 10px; --r-sm: 7px;
+    /* quiet buttons: a tint of the text color, so they show on any surface (follows the theme's --ink) */
+    --btn: color-mix(in srgb, var(--ink) 7%, transparent); --btn-hover: color-mix(in srgb, var(--ink) 12%, transparent);
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -78,8 +80,8 @@
   .host-chip.copied { background: var(--accent-soft); color: var(--accent-ink); }
   .host-chip .lock { color: var(--accent); display: inline-flex; }
   .chip-warn { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 100px; padding: 2px 9px; white-space: nowrap; }
-  .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); border: 0; color: var(--muted); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
-  .icon-btn:hover { color: var(--ink); background: var(--border); }
+  .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--btn); border: 0; color: var(--muted); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
+  .icon-btn:hover { color: var(--ink); background: var(--btn-hover); }
   .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* uniform header control height */
   .status-pill, .host-chip, .namebox input { height: 32px; }
@@ -111,21 +113,17 @@
   /* ---------- center ---------- */
   .center { display: flex; flex-direction: column; min-height: 0; }
   .tabs { display: flex; align-items: center; gap: 2px; padding: 8px 10px 4px; }
-  .tab-spacer { flex: 1; }
-  #dlAllBtn { margin-right: 6px; }
   /* buttons: quiet secondary by default; one filled primary per section; red only for destructive */
-  .mini-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--ink); background: var(--surface-2); border: 0; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background .15s, color .15s, filter .15s; }
-  .mini-btn:hover:not(:disabled) { background: var(--border); }
+  .mini-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--ink); background: var(--btn); border: 0; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background .15s, color .15s, filter .15s; }
+  .mini-btn:hover:not(:disabled) { background: var(--btn-hover); }
   .mini-btn:disabled { opacity: .45; cursor: not-allowed; }
   .mini-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .mini-btn.btn-primary { background: var(--accent); color: #04150F; }
   .mini-btn.btn-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.07); }
   .mini-btn.btn-danger:hover:not(:disabled) { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
   /* text fields: a soft edge at rest (the fill does most of the work), a soft accent edge while typing */
-  .namebox input, .composer textarea, .px-field input, .pin-field, .sto-input, .pin-input { border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
-  .namebox input:focus, .composer textarea:focus, .px-field input:focus, .pin-field:focus, .sto-input:focus, .pin-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
-  /* one control height across the app: buttons and single-line fields are all 32px */
-  .px-field input, .pin-field, .sto-input { height: 32px; }
+  .namebox input, .composer textarea, .input, .pin-input { border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  .namebox input:focus, .composer textarea:focus, .input:focus, .pin-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .form-err { font-family: var(--mono); font-size: 11.5px; color: var(--error); line-height: 1.45; }
   .dl.del:hover { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
   .tab { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 9px 14px; border-radius: 8px 8px 0 0; position: relative; }
@@ -139,29 +137,54 @@
   /* host-only config tabs carry a small status dot (green = active) */
   .tdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--faint); transition: background .15s; }
   .tdot.on { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  /* config views (sharing / live site / servers): a scrollable, readable-width column */
-  .cfg-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
-  .cfg { display: flex; flex-direction: column; gap: 12px; }
-  .cfg .px-field, .cfg .field { max-width: 560px; } /* keep inputs readable; text below flows full width */
-  /* ssh / ftp service views */
-  .svc-row { display: flex; align-items: center; gap: 12px; }
-  .svc-info { flex: 1; min-width: 0; }
-  .svc-title { font-family: var(--mono); font-size: 13px; color: var(--ink); }
-  .svc-status { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-  .svc-cfg { max-width: none; } /* ssh/ftp use the full width so lines don't wrap */
-  .svc-connect { display: flex; align-items: center; gap: 10px; }
-  .svc-connect .svc-k { flex-shrink: 0; width: 68px; font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+  /* ---------- standard building blocks: every tab and the settings drawer are made of these ----------
+     view-body > sec: [sec-head: h3 · sec-meta · sec-tools] [sec-desc] [body: rows, fields, lists] [sec-actions] */
+  .view-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--r); }
+  .sec.plain { padding: 0; background: none; } /* list views: rows carry their own fill */
+  .sec.grow { flex: 1; min-height: 0; }
+  .view-body > .sec:not(.plain) { max-width: 760px; } /* forms stay readable on wide screens */
+  .sec-head { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; min-height: 32px; }
+  .sec-head h3 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+  .sec-meta { min-width: 0; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .sec-meta.on { color: var(--accent-ink); font-weight: 700; }
+  .sec-meta.warn { color: var(--warn); }
+  .sec-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sec-desc { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.45; }
+  .sec-desc.warn { color: var(--warn); }
+  .sec-text { font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.5; word-break: break-all; }
+  .sec-text a { color: var(--accent); }
+  .sec-actions, .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .row.spread { justify-content: space-between; gap: 14px; flex-wrap: nowrap; }
+  .row.end { align-items: flex-end; }
+  .row-title { font-size: 13px; color: var(--ink); }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .row > .field { flex: 1; min-width: 120px; }
+  .row > .field.narrow { flex: 0 1 140px; min-width: 100px; }
+  .field-label { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .input { height: 32px; width: 100%; min-width: 0; background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; }
+  .row > .input { flex: 1; width: auto; }
+  .input.pin { min-width: 96px; font-size: 13px; letter-spacing: .12em; }
+  .sec .input, .sec .svc-box, .sec .br-picker { background-color: var(--surface); } /* -color: keeps the select's chevron */
+  .check { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  /* dropdowns: the app's field style, with a themed chevron and option list */
+  select.input { appearance: none; cursor: pointer; padding-right: 28px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  select.input option { background-color: var(--surface); color: var(--ink); }
+  .v { font-family: var(--mono); font-size: 13px; color: var(--ink); word-break: break-all; }
+  /* a read-only value with a copy button (ssh / ftp connect lines) */
   .svc-box { display: inline-flex; align-items: stretch; width: min(100%, 440px); background: var(--surface-2); border-radius: 8px; overflow: hidden; }
   .svc-box code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; display: flex; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 7px 10px; }
   .svc-box .svc-copy { flex-shrink: 0; width: 32px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
   .svc-box .svc-copy:hover { color: var(--accent-ink); background: var(--border); }
   .svc-copy.copied, .copy.copied { color: var(--accent-ink); }
-  /* sharing tab = browse (left) + sharing config (right) */
-  .share-split { flex: 1; min-height: 0; display: flex; gap: 8px; }
-  .share-browse { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  /* browse files = the shared folder (left) + sharing setup (right, host only) */
+  .share-split { flex: 1; min-height: 0; display: flex; gap: 12px; }
+  .share-browse { min-width: 0; }
   .share-browse .brlist { flex: 1; min-height: 0; overflow-y: auto; }
-  .share-config { flex: 0 0 370px; min-height: 0; overflow-y: auto; }
-  .share-config .cfg-wrap { padding: 14px; } .share-config .cfg { max-width: none; }
+  .share-config { flex: 0 0 370px; align-self: flex-start; }
+  .chat-head { padding: 10px 16px 0; }
 
   /* chat */
   .chat-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
@@ -209,7 +232,6 @@
   .send:disabled { opacity: .5; cursor: not-allowed; }
 
   /* files */
-  .files-wrap { flex: 1; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
   .drop { border-radius: var(--r); padding: 26px; text-align: center; color: var(--muted); background: var(--surface-2); display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
   .drop:hover, .drop.over { background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); color: var(--ink); }
   .drop .big { color: var(--accent); }
@@ -224,10 +246,6 @@
   .fsubrow .fsubname { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fsubrow .fsize { font-family: var(--mono); font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .fsubrow.more { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
-  .drop-foot { display: flex; flex-direction: column; gap: 4px; margin-top: -6px; }
-  .drop-usage { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
-  .drop-usage:empty { display: none; }
-  .drop-usage.full { color: var(--warn); }
   .flist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .frow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); transition: background .15s; }
   .frow .fi { width: 34px; height: 34px; border-radius: 7px; display: grid; place-items: center; background: var(--surface); color: var(--accent); flex-shrink: 0; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
@@ -238,34 +256,24 @@
   .frow.uploading { background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
   .uprog { margin-top: 5px; height: 4px; background: var(--surface); border-radius: 3px; overflow: hidden; }
   .upbar { height: 100%; background: var(--accent); border-radius: 3px; transition: width .12s ease; }
-  .dl { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; color: var(--muted); background: var(--surface); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
+  .dl { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; color: var(--muted); background: var(--btn); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
   .dl:hover { color: var(--accent-ink); background: var(--accent-soft); }
   .files-empty { font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: center; padding: 10px; }
   /* browse pane (inside the sharing tab) */
-  .browse-bar { display: flex; align-items: center; gap: 8px; }
   .brpath { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .brlist { overflow-y: auto; min-height: 0; }
   .frow.dir { cursor: pointer; }
   .frow.dir:hover { background: var(--accent-soft); }
-  /* admin: file browsing / live site / servers (shown as center tabs) */
-  .br-status { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.5; word-break: break-all; }
-  .br-picker { background: var(--surface-2); border-radius: var(--r-sm); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-  .br-picker .mini-btn { background: var(--surface); }
-  .br-picker .mini-btn:hover:not(:disabled) { background: var(--border); }
+  /* host folder picker (browse files) */
+  .br-picker { border-radius: var(--r-sm); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
   .br-pick-bar { display: flex; align-items: center; gap: 8px; }
   .nav-btns { display: flex; gap: 4px; }
   .br-pick-list { max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .br-pick-item { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); padding: 6px 8px; border-radius: 6px; cursor: pointer; }
   .br-pick-item span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .br-pick-item .bic { color: var(--accent); display: inline-flex; flex-shrink: 0; }
-  .br-pick-item:hover { background: var(--surface); }
+  .br-pick-item:hover { background: var(--btn-hover); }
   .br-pick-item.empty { color: var(--faint); cursor: default; }
-  .br-write { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  .px-field { display: flex; flex-direction: column; gap: 4px; }
-  .px-label { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-  .px-field input { background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12px; width: 100%; }
-  #pxStatus a { color: var(--accent); word-break: break-all; }
-  .br-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   /* ---------- settings drawer (host only): join PIN, storage, about this host ---------- */
   #gear[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-soft); }
@@ -289,11 +297,8 @@
   @media (min-width: 1100px) {
     .stream-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; max-width: 1200px; }
   }
-  .sync-opt { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
-  #playPick, #playUrl { flex: 1; min-width: 0; }
   #npMedia iframe.stream-video { display: block; aspect-ratio: 16 / 9; height: auto; border: 0; }
   #npMedia audio { width: 100%; }
-  .np-actions { justify-content: flex-start; gap: 8px; }
   .stream-video { width: 100%; max-height: 60vh; background: #000; border-radius: var(--r-sm); }
   .audio-only { padding: 26px 12px; text-align: center; border-radius: var(--r-sm); background: var(--surface); font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
   .live-badge { color: var(--error); text-transform: uppercase; }
@@ -301,47 +306,21 @@
   .live-row .lr-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .live-row .lr-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
   .sys .mini-btn { margin-left: 8px; }
-  .pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .pref-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .pref-title { font-size: 13px; color: var(--ink); }
-  .pin-note.warn { color: var(--warn); }
   .seg { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 3px; background: var(--surface); border-radius: 8px; }
   .seg button { border: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 12px; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; }
   .seg button:hover { color: var(--ink); }
   .seg button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
-  .set-sec { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--r); }
-  .set-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .set-head h3 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
-  .set-sec .pin-field, .set-sec .sto-input { background-color: var(--surface); } /* -color: keeps the select's chevron */
-  /* join PIN: the host's setting and the guests' PIN screen */
-  .pin-state { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-  .pin-state.on { color: var(--accent-ink); font-weight: 700; }
-  .pin-set { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pin-field { flex: 1; min-width: 96px; background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 13px; letter-spacing: .12em; }
-  .pin-note, .lock-hint { font-size: 11.5px; color: var(--faint); line-height: 1.45; }
-  .sto-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
-  .sto-field { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 3px; }
-  .sto-label { font-size: 11px; color: var(--muted); }
-  .sto-input { background: var(--surface-2); border-radius: 8px; padding: 0 9px; color: var(--ink); font-family: var(--mono); font-size: 12.5px; width: 100%; }
-  /* dropdowns: drop the OS look for the app's field style, with a themed chevron and option list */
-  select.sto-input { appearance: none; cursor: pointer; padding-right: 28px;
-    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-    background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
-  select.sto-input option { background-color: var(--surface); color: var(--ink); }
+  /* the guests' PIN screen */
   .lock-screen { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
   .lock-box { width: min(100%, 320px); display: flex; flex-direction: column; gap: 12px; background: var(--surface); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow); }
   .lock-label { font-size: 14px; color: var(--ink); }
   .pin-input { font-family: var(--mono); font-size: 24px; letter-spacing: .4em; text-align: center; padding: 10px; background: var(--surface-2); border-radius: 8px; color: var(--ink); width: 100%; }
   .lock-box .brand { order: 0; } /* the mobile topbar reorders .brand; keep it on top here */
-  .kv { display: flex; flex-direction: column; gap: 3px; }
-  .k { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
-  .k-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .v { font-family: var(--mono); font-size: 13px; color: var(--ink); word-break: break-all; }
   .fingerprint { display: flex; align-items: center; gap: 8px; }
   .fingerprint .v { font-size: 11.5px; color: var(--muted); }
   .qr { width: 140px; height: 140px; background: #fff; border-radius: 8px; padding: 8px; }
   .dev-qr { margin-top: auto; padding: 12px 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--surface-2); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: background .15s, color .15s; }
+  .copy { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--btn); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: background .15s, color .15s; }
   .copy:hover { color: var(--accent-ink); background: var(--accent-soft); }
   .switch { position: relative; width: 40px; height: 23px; flex-shrink: 0; cursor: pointer; }
   .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
@@ -352,8 +331,6 @@
   .switch input:disabled { cursor: default; }
   .switch input:disabled + .track { opacity: .5; }
   .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .rail-note { font-family: var(--mono); font-size: 11px; color: var(--faint); padding: 10px 12px; display: flex; gap: 7px; align-items: flex-start; line-height: 1.45; }
-  .rail-note .lock { color: var(--muted); flex-shrink: 0; margin-top: 1px; }
 
   .foot { flex: 0 0 auto; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--faint); margin: 0; }
 
@@ -385,7 +362,7 @@
     /* devices become a compact horizontal strip so chat/files get the vertical space */
     .col-left { display: contents; }
     .tabs { flex-wrap: wrap; }
-    .cfg-wrap { padding: 12px; }
+    .view-body { padding: 12px; }
     /* sharing: config on top, browse below */
     .share-split { flex-direction: column-reverse; }
     .share-config { flex: 0 0 auto; }
@@ -421,58 +398,55 @@
     </div>
     <div class="drawer-body">
       <!-- everyone: this device's preferences -->
-      <section class="set-sec" aria-labelledby="setPrefH">
-        <div class="set-head"><h3 id="setPrefH">Preferences</h3><span class="pin-state">this device</span></div>
-        <div class="pref-row">
-          <div class="pref-info"><div class="pref-title">Theme</div></div>
+      <section class="sec" aria-labelledby="setPrefH">
+        <div class="sec-head"><h3 id="setPrefH">Preferences</h3><span class="sec-meta">this device</span></div>
+        <div class="row spread">
+          <div class="row-title">Theme</div>
           <div class="seg" role="radiogroup" aria-label="Theme">
             <button type="button" role="radio" data-theme-opt="system" aria-checked="true">system</button>
             <button type="button" role="radio" data-theme-opt="light" aria-checked="false">light</button>
             <button type="button" role="radio" data-theme-opt="dark" aria-checked="false">dark</button>
           </div>
         </div>
-        <div class="pref-row">
-          <div class="pref-info"><div class="pref-title">Notifications</div><div class="pin-note" id="notifyNote">Alerts for new messages and files while this page is in the background.</div></div>
+        <div class="row spread">
+          <div><div class="row-title">Notifications</div><p class="sec-desc" id="notifyNote">Alerts for new messages and files while this page is in the background.</p></div>
           <label class="switch"><input type="checkbox" id="notifySwitch" aria-label="Notifications for new messages and files"><span class="track"></span><span class="knob"></span></label>
         </div>
       </section>
 
       <!-- host only -->
       <div class="host-settings" id="hostSettings" hidden>
-      <section class="set-sec" aria-labelledby="setPinH">
-        <div class="set-head"><h3 id="setPinH">Join PIN</h3><span class="pin-state" id="pinState">off</span></div>
-        <div class="pin-set">
-          <input class="pin-field" id="admPin" type="text" inputmode="numeric" maxlength="8" placeholder="4-8 digits" spellcheck="false" autocomplete="off" aria-label="Join PIN" />
+      <section class="sec" aria-labelledby="setPinH">
+        <div class="sec-head"><h3 id="setPinH">Join PIN</h3><span class="sec-meta" id="pinState">off</span></div>
+        <p class="sec-desc" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</p>
+        <div class="row">
+          <input class="input pin" id="admPin" type="text" inputmode="numeric" maxlength="8" placeholder="4-8 digits" spellcheck="false" autocomplete="off" aria-label="Join PIN" />
           <button class="mini-btn btn-primary" id="admPinSave" type="button" disabled>set PIN</button>
           <button class="mini-btn btn-danger" id="admPinOff" type="button" hidden>turn off</button>
         </div>
         <div class="form-err" id="admPinErr" role="alert" hidden></div>
-        <div class="pin-note" id="pinNote">Off: anyone on this network can join. Set a PIN on shared Wi-Fi.</div>
       </section>
 
-      <section class="set-sec" aria-labelledby="setStoH">
-        <div class="set-head"><h3 id="setStoH">Storage</h3><span class="pin-state" id="stoState">no limits</span></div>
-        <div class="sto-grid">
-          <label class="sto-field"><span class="sto-label">Drop files quota (GB)</span><input class="sto-input" id="stoQuota" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="no limit" /></label>
-          <label class="sto-field"><span class="sto-label">Auto-clear</span>
-            <select class="sto-input" id="stoExpire"><option value="">off</option><option value="1">after 1 hour</option><option value="24">after 24 hours</option><option value="168">after 7 days</option></select>
+      <section class="sec" aria-labelledby="setStoH">
+        <div class="sec-head"><h3 id="setStoH">Storage</h3><span class="sec-meta" id="stoState">no limits</span></div>
+        <p class="sec-desc">The hub always keeps 1 GB (or 5% of the disk) free, quota or not.</p>
+        <div class="row end">
+          <label class="field"><span class="field-label">Drop files quota (GB)</span><input class="input" id="stoQuota" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="no limit" /></label>
+          <label class="field"><span class="field-label">Auto-clear</span>
+            <select class="input" id="stoExpire"><option value="">off</option><option value="1">after 1 hour</option><option value="24">after 24 hours</option><option value="168">after 7 days</option></select>
           </label>
-          <button class="mini-btn btn-primary sto-save" id="stoSave" type="button" disabled>save</button>
+          <button class="mini-btn btn-primary" id="stoSave" type="button" disabled>save</button>
         </div>
         <div class="form-err" id="stoErr" role="alert" hidden></div>
-        <div class="pin-note">The hub always keeps 1 GB (or 5% of the disk) free, quota or not.</div>
       </section>
 
-      <section class="set-sec" aria-labelledby="setAboutH">
-        <div class="set-head"><h3 id="setAboutH">About this host</h3></div>
-        <div class="kv"><span class="k">Host name</span><span class="v" id="admHost">-</span></div>
-        <div class="kv"><span class="k">Bound interface</span><span class="v" id="admIface">-</span></div>
-        <div class="kv" id="admNameRow" hidden>
-          <div class="k-row"><span class="k">By name</span><span class="pin-state">iPhone, Mac, Windows, Linux</span></div>
-          <span class="v" id="admName">-</span>
-        </div>
-        <div class="kv">
-          <div class="k-row"><span class="k">TLS fingerprint (SHA-256)</span><span class="chip-warn" title="Self-signed certificate - verify this fingerprint">self-signed</span></div>
+      <section class="sec" aria-labelledby="setAboutH">
+        <div class="sec-head"><h3 id="setAboutH">About this host</h3></div>
+        <div class="field"><span class="field-label">Host name</span><span class="v" id="admHost">-</span></div>
+        <div class="field"><span class="field-label">Bound interface</span><span class="v" id="admIface">-</span></div>
+        <div class="field" id="admNameRow" hidden><span class="field-label">By name · iPhone, Mac, Windows, Linux</span><span class="v" id="admName">-</span></div>
+        <div class="field">
+          <span class="field-label">TLS fingerprint (SHA-256) <span class="chip-warn" title="Self-signed certificate - verify this fingerprint">self-signed</span></span>
           <div class="fingerprint"><span class="v" id="admFp">-</span>
             <button class="copy" id="copyfp" aria-label="Copy fingerprint" title="Copy fingerprint">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
@@ -496,7 +470,7 @@
       <input class="pin-input" id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinErr" />
       <button class="mini-btn btn-primary" id="pinBtn" type="submit" disabled>join</button>
       <div class="form-err" id="pinErr" role="alert" hidden></div>
-      <div class="lock-hint">Ask the host for the PIN. It's shown in their dashboard.</div>
+      <p class="sec-desc">Ask the host for the PIN. It's shown in their dashboard.</p>
     </form>
   </div>
   <div class="app">
@@ -519,7 +493,7 @@
           <div class="panel-head"><span class="panel-title">Devices</span><span class="count" id="count">0</span></div>
           <div id="roster"><div class="dev-empty">No devices yet.</div></div>
           <div class="dev-qr">
-            <span class="k">Scan to join</span>
+            <span class="panel-title">Scan to join</span>
             <img class="qr" id="qr" alt="Scan to open the hub on another device" width="140" height="140" />
           </div>
         </section>
@@ -535,12 +509,11 @@
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="live" id="liveTab" hidden><span class="tdot" id="liveDot"></span>serve site</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ssh" id="sshTab" hidden><span class="tdot" id="sshDot"></span>ssh</button>
           <button class="tab host-tab" role="tab" aria-selected="false" data-view="ftp" id="ftpTab" hidden><span class="tdot" id="ftpDot"></span>ftp</button>
-          <span class="tab-spacer"></span>
-          <button class="mini-btn" id="dlAllBtn" type="button" title="Download every shared file as one zip" disabled>download all</button>
-          <button class="mini-btn btn-danger" id="clearBtn" type="button">clear files</button>
         </div>
 
         <div class="view" id="view-chat" role="tabpanel">
+          <div class="sec-head chat-head"><h3>Chat</h3>
+            <span class="sec-tools"><button class="mini-btn btn-danger" id="clearChatBtn" type="button">clear chat</button></span></div>
           <div class="chat-log" id="log"></div>
           <form class="composer" id="composer" autocomplete="off">
             <button type="button" class="icon-btn" id="attach" aria-label="Share a file">
@@ -554,31 +527,36 @@
         </div>
 
         <div class="view active" id="view-files" role="tabpanel">
-          <div class="files-wrap">
-            <label class="drop" id="drop">
-              <input type="file" id="fileInput" multiple hidden />
-              <span class="big"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg></span>
-              <strong>Drop files or folders here to share</strong>
-              <small>or click to pick files, or <button type="button" class="linkish" id="pickFolder">pick a folder</button> - sent to every device on the hub</small>
-            </label>
-            <input type="file" id="folderInput" webkitdirectory multiple hidden />
-            <div class="drop-foot">
-              <span class="drop-usage" id="dropUsage"></span>
+          <div class="view-body">
+            <section class="sec plain grow" aria-labelledby="filesH">
+              <div class="sec-head"><h3 id="filesH">Shared files</h3><span class="sec-meta" id="dropUsage"></span>
+                <span class="sec-tools">
+                  <button class="mini-btn" id="dlAllBtn" type="button" title="Download every shared file as one zip" disabled>download all</button>
+                  <button class="mini-btn btn-danger" id="clearBtn" type="button">clear files</button>
+                </span></div>
+              <label class="drop" id="drop">
+                <input type="file" id="fileInput" multiple hidden />
+                <span class="big"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg></span>
+                <strong>Drop files or folders here to share</strong>
+                <small>or click to pick files, or <button type="button" class="linkish" id="pickFolder">pick a folder</button> - sent to every device on the hub</small>
+              </label>
+              <input type="file" id="folderInput" webkitdirectory multiple hidden />
               <div class="form-err" id="dropErr" role="alert" hidden></div>
-            </div>
-            <div class="flist" id="flist"><div class="files-empty">No files shared yet.</div></div>
+              <div class="flist" id="flist"><div class="files-empty">No files shared yet.</div></div>
+            </section>
           </div>
         </div>
 
         <!-- live streams: WebRTC peer to peer; the hub only relays setup messages -->
         <div class="view" id="view-stream" role="tabpanel">
-          <div class="cfg-wrap"><div class="stream-layout">
+          <div class="view-body"><div class="stream-layout">
             <div class="stream-main">
             <div class="form-err" id="liveErr" role="alert" hidden></div>
             <!-- host only: other devices can only watch -->
-            <section class="set-sec" id="goLiveBox" aria-labelledby="goLiveH" hidden>
-              <div class="set-head"><h3 id="goLiveH">Live</h3><span class="pin-state">up to <span id="liveMax">10</span> viewers</span></div>
-              <div class="pref-row">
+            <section class="sec" id="goLiveBox" aria-labelledby="goLiveH" hidden>
+              <div class="sec-head"><h3 id="goLiveH">Go live</h3><span class="sec-meta">up to <span id="liveMax">10</span> viewers</span></div>
+              <p class="sec-desc">Video and sound go straight from this device to each viewer over the network.</p>
+              <div class="row spread">
                 <div class="seg" role="radiogroup" aria-label="What to stream">
                   <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
                   <button type="button" role="radio" data-live-kind="audio" aria-checked="false">microphone</button>
@@ -588,142 +566,136 @@
               </div>
             </section>
 
-            <!-- host only: play a shared video/audio file for everyone -->
-            <section class="set-sec" id="playBox" aria-labelledby="playH" hidden>
-              <div class="set-head"><h3 id="playH">Play a file for everyone</h3>
-                <label class="sync-opt"><input type="checkbox" id="npSync" checked /> keep everyone in sync</label></div>
-              <div class="pref-row">
-                <select class="sto-input" id="playPick" aria-label="A shared video or audio file"></select>
+            <!-- host only: play a shared video/audio file or a link for everyone -->
+            <section class="sec" id="playBox" aria-labelledby="playH" hidden>
+              <div class="sec-head"><h3 id="playH">Play for everyone</h3>
+                <span class="sec-tools"><label class="check"><input type="checkbox" id="npSync" checked /> keep everyone in sync</label></span></div>
+              <p class="sec-desc">A shared file, a file from this device, or a link. Links stream from the internet on each device, so every device needs internet access.</p>
+              <div class="row">
+                <select class="input" id="playPick" aria-label="A shared video or audio file"></select>
                 <button class="mini-btn btn-primary" id="playShared" type="button" disabled>play</button>
               </div>
-              <div class="pref-row">
-                <span class="pin-note">Not shared yet?</span>
+              <div class="row">
+                <span class="sec-desc">Not shared yet?</span>
                 <button class="mini-btn" id="playUpload" type="button">choose a video or audio file…</button>
                 <input type="file" id="playInput" accept="video/*,audio/*" hidden />
               </div>
-              <div class="pref-row">
-                <input class="sto-input" id="playUrl" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="or paste a link: YouTube, or https://…/video.mp4" aria-label="A YouTube or video/audio link" />
+              <div class="row">
+                <input class="input" id="playUrl" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="or paste a link: YouTube, or https://…/video.mp4" aria-label="A YouTube or video/audio link" />
                 <button class="mini-btn btn-primary" id="playLink" type="button" disabled>play link</button>
               </div>
-              <div class="pin-note">Links stream from the internet on each device, so every device needs internet access.</div>
             </section>
 
-            <section class="set-sec" id="nowPlaying" hidden>
-              <div class="set-head"><h3 id="npTitle">-</h3><span class="pin-state" id="npState">-</span></div>
+            <section class="sec" id="nowPlaying" hidden>
+              <div class="sec-head"><h3 id="npTitle">-</h3><span class="sec-meta" id="npState">-</span></div>
               <div id="npMedia"></div>
-              <div class="pref-row np-actions">
+              <div class="sec-actions">
                 <button class="mini-btn btn-primary" id="npJoin" type="button" hidden>join playback</button>
                 <button class="mini-btn" id="npResync" type="button" hidden>resync</button>
                 <button class="mini-btn btn-danger" id="npStop" type="button" hidden>stop for everyone</button>
               </div>
             </section>
 
-            <section class="set-sec" id="myLive" hidden>
-              <div class="set-head"><h3><span class="live-badge">● live</span></h3><span class="pin-state" id="myViewers">0 watching</span></div>
+            <section class="sec" id="myLive" hidden>
+              <div class="sec-head"><h3>Your stream</h3><span class="sec-meta live-badge">● live</span><span class="sec-meta" id="myViewers">0 watching</span></div>
               <video class="stream-video" id="myPreview" muted playsinline autoplay></video>
               <div class="audio-only" id="myAudioOnly" hidden>microphone only</div>
-              <button class="mini-btn btn-danger" id="stopLive" type="button">stop</button>
+              <div class="sec-actions"><button class="mini-btn btn-danger" id="stopLive" type="button">stop</button></div>
             </section>
 
-            <section class="set-sec" id="watching" hidden>
-              <div class="set-head"><h3 id="watchTitle">-</h3><span class="pin-state" id="watchState">connecting…</span></div>
+            <section class="sec" id="watching" hidden>
+              <div class="sec-head"><h3 id="watchTitle">-</h3><span class="sec-meta" id="watchState">connecting…</span></div>
               <video class="stream-video" id="watchVideo" playsinline controls></video>
               <div class="audio-only" id="watchAudioOnly" hidden>audio only</div>
-              <button class="mini-btn" id="stopWatch" type="button">leave</button>
+              <div class="sec-actions"><button class="mini-btn" id="stopWatch" type="button">leave</button></div>
             </section>
             <div class="files-empty" id="liveIdle" hidden>Pick a stream from Live now to watch it.</div>
             </div>
 
-            <section class="set-sec stream-side" aria-labelledby="liveNowH">
-              <div class="set-head"><h3 id="liveNowH">Live now</h3></div>
+            <section class="sec stream-side" aria-labelledby="liveNowH">
+              <div class="sec-head"><h3 id="liveNowH">Live now</h3></div>
               <div id="liveList"><div class="files-empty">Nothing is live right now.</div></div>
             </section>
           </div></div>
         </div>
 
         <div class="view" id="view-sharing" role="tabpanel">
-          <div class="share-split">
-            <div class="share-browse">
-              <div class="browse-bar">
-                <span class="nav-btns"><button class="mini-btn" id="brRoot" type="button" title="Root folder">root</button><button class="mini-btn" id="brUp" type="button" title="Up one level">up</button></span>
-                <span class="brpath" id="brPath">/</span>
-                <button class="mini-btn" id="brDlAll" type="button" title="Download this folder as one zip" disabled>download all</button>
-                <button type="button" class="icon-btn" id="brAttach" title="Upload to this folder" style="display:none">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
-                </button>
-                <input type="file" id="brFileInput" multiple hidden />
-              </div>
+          <div class="view-body"><div class="share-split">
+            <section class="sec plain grow share-browse" aria-labelledby="brH">
+              <div class="sec-head"><h3 id="brH">Shared folder</h3><span class="sec-meta brpath" id="brPath">/</span>
+                <span class="sec-tools">
+                  <button class="mini-btn" id="brRoot" type="button" title="Root folder">root</button>
+                  <button class="mini-btn" id="brUp" type="button" title="Up one level">up</button>
+                  <button class="mini-btn" id="brDlAll" type="button" title="Download this folder as one zip" disabled>download all</button>
+                  <button type="button" class="icon-btn" id="brAttach" title="Upload to this folder" style="display:none">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+                  </button>
+                </span></div>
+              <input type="file" id="brFileInput" multiple hidden />
               <div class="brlist flist" id="brList"><div class="files-empty">Nothing shared yet.</div></div>
-            </div>
-            <div class="share-config" id="shareConfig">
-              <div class="cfg-wrap"><div class="cfg">
-                <div class="br-status" id="brStatus">Off - clients cannot browse your files.</div>
-                <div class="br-picker" id="brPicker">
-                  <div class="br-pick-bar"><span class="nav-btns"><button class="mini-btn" id="brPickRoot" type="button">root</button><button class="mini-btn" id="brPickUp" type="button">up</button></span><span class="brpath" id="brPickPath">-</span></div>
-                  <div class="br-pick-list" id="brPickList"></div>
-                  <label class="br-write"><input type="checkbox" id="brWrite" /> allow uploads (writable)</label>
-                </div>
-                <div class="br-actions">
-                  <button class="mini-btn btn-primary" id="brShare" type="button" disabled>share this folder</button>
-                  <button class="mini-btn" id="brStop" type="button" hidden>stop sharing</button>
-                </div>
-                <div class="form-err" id="brErr" role="alert" hidden></div>
-                <div class="rail-note">
-                  <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-                  Exposes the chosen folder to everyone on the network (no login). Off by default.
-                </div>
-              </div></div>
-            </div>
-          </div>
+            </section>
+            <!-- host only -->
+            <section class="sec share-config" id="shareConfig" aria-labelledby="brShareH">
+              <div class="sec-head"><h3 id="brShareH">Share a folder</h3><span class="sec-meta" id="brState">off</span></div>
+              <p class="sec-desc">Shows the chosen folder to everyone on the network, with no login. Off by default.</p>
+              <div class="sec-text" id="brStatus">Pick a folder below, then share it.</div>
+              <div class="br-picker" id="brPicker">
+                <div class="br-pick-bar"><span class="nav-btns"><button class="mini-btn" id="brPickRoot" type="button">root</button><button class="mini-btn" id="brPickUp" type="button">up</button></span><span class="brpath" id="brPickPath">-</span></div>
+                <div class="br-pick-list" id="brPickList"></div>
+                <label class="check"><input type="checkbox" id="brWrite" /> allow uploads (writable)</label>
+              </div>
+              <div class="sec-actions">
+                <button class="mini-btn btn-primary" id="brShare" type="button" disabled>share this folder</button>
+                <button class="mini-btn" id="brStop" type="button" hidden>stop sharing</button>
+              </div>
+              <div class="form-err" id="brErr" role="alert" hidden></div>
+            </section>
+          </div></div>
         </div>
 
         <div class="view" id="view-live" role="tabpanel">
-          <div class="cfg-wrap"><div class="cfg">
-            <div class="br-status" id="pxStatus">Off - no live site is being served.</div>
-            <img class="qr" id="pxQr" alt="Scan to open the served site on another device" width="140" height="140" hidden />
-            <span class="pin-note" id="pxQrNote" hidden>Scan to open the site on a phone.</span>
-            <label class="px-field"><span class="px-label">Target (your running server)</span><input id="pxTarget" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:3000" /></label>
-            <label class="px-field"><span class="px-label">Serve on port</span><input id="pxPort" type="number" min="1" max="65535" value="8080" /></label>
-            <div class="br-actions">
-              <button class="mini-btn btn-primary" id="pxShare" type="button" disabled>serve this site</button>
-              <button class="mini-btn" id="pxStop" type="button" hidden>stop</button>
-            </div>
-            <div class="form-err" id="pxErr" role="alert" hidden></div>
-            <div class="rail-note">
-              <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-              Re-serves a web app you're running (any http/https/node) to everyone on the network, over HTTPS. Off by default.
-            </div>
-          </div></div>
+          <div class="view-body">
+            <section class="sec" aria-labelledby="pxH">
+              <div class="sec-head"><h3 id="pxH">Serve a site</h3><span class="sec-meta" id="pxState">off</span></div>
+              <p class="sec-desc">Re-serves a web app you're running (any http/https/node) to everyone on the network, over HTTPS. Off by default.</p>
+              <div class="sec-text" id="pxStatus">Enter your running app's address, then serve it.</div>
+              <img class="qr" id="pxQr" alt="Scan to open the served site on another device" width="140" height="140" hidden />
+              <p class="sec-desc" id="pxQrNote" hidden>Scan to open the site on a phone.</p>
+              <div class="row">
+                <label class="field"><span class="field-label">Target (your running server)</span><input class="input" id="pxTarget" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:3000" /></label>
+                <label class="field narrow"><span class="field-label">Serve on port</span><input class="input" id="pxPort" type="number" min="1" max="65535" value="8080" /></label>
+              </div>
+              <div class="sec-actions">
+                <button class="mini-btn btn-primary" id="pxShare" type="button" disabled>serve this site</button>
+                <button class="mini-btn" id="pxStop" type="button" hidden>stop</button>
+              </div>
+              <div class="form-err" id="pxErr" role="alert" hidden></div>
+            </section>
+          </div>
         </div>
 
         <div class="view" id="view-ftp" role="tabpanel">
-          <div class="cfg-wrap"><div class="cfg svc-cfg">
-            <div class="svc-row">
-              <div class="svc-info"><div class="svc-title">FTP / FTPS</div><div class="svc-status" id="ftpStatus">Off</div></div>
-              <label class="switch"><input type="checkbox" id="ftpToggle" data-id="ftp"><span class="track"></span><span class="knob"></span></label>
-            </div>
-            <div class="svc-connect"><span class="svc-k">connect</span><div class="svc-box"><code id="ftpCmd">-</code><button class="svc-copy" id="ftpCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
-            <div class="svc-connect"><span class="svc-k">password</span><div class="svc-box"><code id="ftpPass">-</code><button class="svc-copy" id="ftpPassCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
-            <div class="rail-note">
-              <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-              Explicit-TLS FTP, jailed to the shared files. Host only - served on 127.0.0.1.
-            </div>
-          </div></div>
+          <div class="view-body">
+            <section class="sec" aria-labelledby="ftpH">
+              <div class="sec-head"><h3 id="ftpH">FTP / FTPS</h3><span class="sec-meta" id="ftpStatus">Off</span>
+                <span class="sec-tools"><label class="switch"><input type="checkbox" id="ftpToggle" data-id="ftp" aria-label="FTP server on or off"><span class="track"></span><span class="knob"></span></label></span></div>
+              <p class="sec-desc">FTP with explicit TLS, limited to the shared files. Only the host can turn it on.</p>
+              <div class="field"><span class="field-label">Connect</span><div class="svc-box"><code id="ftpCmd">-</code><button class="svc-copy" id="ftpCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
+              <div class="field"><span class="field-label">Password</span><div class="svc-box"><code id="ftpPass">-</code><button class="svc-copy" id="ftpPassCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
+            </section>
+          </div>
         </div>
 
         <div class="view" id="view-ssh" role="tabpanel">
-          <div class="cfg-wrap"><div class="cfg svc-cfg">
-            <div class="svc-row">
-              <div class="svc-info"><div class="svc-title">SSH / SFTP</div><div class="svc-status" id="sshStatus">Off</div></div>
-              <label class="switch"><input type="checkbox" id="sshToggle" data-id="ssh"><span class="track"></span><span class="knob"></span></label>
-            </div>
-            <div class="svc-connect"><span class="svc-k">connect</span><div class="svc-box"><code id="sshCmd">-</code><button class="svc-copy" id="sshCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
-            <div class="svc-connect"><span class="svc-k">password</span><div class="svc-box"><code id="sshPass">-</code><button class="svc-copy" id="sshPassCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
-            <div class="rail-note">
-              <span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-              Encrypted SFTP, jailed to the shared files (no OS shell). Host only - served on 127.0.0.1.
-            </div>
-          </div></div>
+          <div class="view-body">
+            <section class="sec" aria-labelledby="sshH">
+              <div class="sec-head"><h3 id="sshH">SSH / SFTP</h3><span class="sec-meta" id="sshStatus">Off</span>
+                <span class="sec-tools"><label class="switch"><input type="checkbox" id="sshToggle" data-id="ssh" aria-label="SSH server on or off"><span class="track"></span><span class="knob"></span></label></span></div>
+              <p class="sec-desc">Encrypted SFTP, limited to the shared files, with no OS shell. Only the host can turn it on.</p>
+              <div class="field"><span class="field-label">Connect</span><div class="svc-box"><code id="sshCmd">-</code><button class="svc-copy" id="sshCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
+              <div class="field"><span class="field-label">Password</span><div class="svc-box"><code id="sshPass">-</code><button class="svc-copy" id="sshPassCopy" type="button" aria-label="Copy" title="Copy"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></div>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -1034,7 +1006,7 @@
     const parts = [n+" file"+(n===1?"":"s"), used, u.roomBytes>0 ? fmtSize(u.roomBytes)+" free" : "hub storage is full"];
     if(u.expireHours) parts.push("files clear after "+fmtHours(u.expireHours));
     el.textContent=parts.join(" · ");
-    el.classList.toggle("full", u.roomBytes<=0);
+    el.classList.toggle("warn", u.roomBytes<=0);
   }
   function loadUsage(){ fetch("/files/usage").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(renderUsage).catch(()=>{}); }
   // A folder of hundreds of files arrives as hundreds of events: redraw the list at most once per
@@ -1213,7 +1185,7 @@
     for(const s of list){
       const up = s.state==="Running";
       const dot=$(s.id+"Dot"); if(dot) dot.classList.toggle("on", up);
-      const st=$(s.id+"Status"); if(st) st.textContent = up ? "Running" : "Off";
+      const st=$(s.id+"Status"); if(st){ st.textContent = up ? "running" : "off"; st.classList.toggle("on", up); }
       const cb=$(s.id+"Toggle"); if(cb){ cb.checked=up; cb.disabled=false; } // disabled while a toggle is in flight
     }
     renderConnect();
@@ -1336,11 +1308,14 @@
   }
 
   // ---- admin: file browsing (host only) ----
+  // A section's on/off state in its header.
+  function setOnOff(id, on){ const e=$(id); e.textContent = on ? "on" : "off"; e.classList.toggle("on", on); }
   let brPickCur=""; let brPickParent="";
   function loadAdmBrowse(){
     fetch("/admin/browse").then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(c=>{
       if(c.enabled){ $("brStatus").textContent="Sharing "+c.rootPath+" ("+(c.writable?"read + upload":"read-only")+")."; $("brStop").hidden=false; }
-      else { $("brStatus").textContent="Off - clients cannot browse your files."; $("brStop").hidden=true; }
+      else { $("brStatus").textContent="Pick a folder below, then share it."; $("brStop").hidden=true; }
+      setOnOff("brState", c.enabled);
       $("sharingDot").classList.toggle("on", c.enabled);
     }).catch(()=>{});
   }
@@ -1384,9 +1359,10 @@
         syncPxBtn();
         $("pxQr").src="/admin/proxy/qr?u="+encodeURIComponent(c.url); // the query refreshes it when the URL changes
       } else {
-        $("pxStatus").textContent="Off - no live site is being served.";
+        $("pxStatus").textContent="Enter your running app's address, then serve it.";
         $("pxStop").hidden=true;
       }
+      setOnOff("pxState", c.enabled);
       $("pxQr").hidden = $("pxQrNote").hidden = !c.enabled;
       $("liveDot").classList.toggle("on", c.enabled);
     }).catch(()=>{});
@@ -1421,7 +1397,6 @@
     tab.setAttribute("aria-selected","true");
     document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
     $("view-"+tab.dataset.view).classList.add("active");
-    updateClearBtn();
     if(tab.dataset.view==="sharing") showBrowsePane();
   }));
   function activeView(){ return document.querySelector('.tab[aria-selected="true"]').dataset.view; }
@@ -1494,7 +1469,6 @@
       }catch{ notifyMsg("This browser can't show notifications on this page. The tab title still shows new activity."); }
     }).catch(()=>notifyMsg("Couldn't turn on notifications in this browser."));
   });
-  function updateClearBtn(){ const v=activeView(); $("clearBtn").style.display = (v==="files"||v==="chat") ? "" : "none"; $("clearBtn").textContent = v==="files" ? "clear files" : "clear chat"; $("dlAllBtn").style.display = v==="files" ? "" : "none"; }
   // Download all: the server streams one zip; the button acknowledges the click right away.
   $("dlAllBtn").addEventListener("click",()=>{
     const b=$("dlAllBtn"); if(b.disabled) return;
@@ -1502,13 +1476,11 @@
     b.textContent="downloading…"; b.disabled=true;
     setTimeout(()=>{ b.textContent="download all"; b.disabled = !files.size; }, 1500);
   });
-  updateClearBtn(); // reflect the default tab (files) on load
   $("clearBtn").addEventListener("click",()=>{
-    if(activeView()==="files"){
-      if(confirm("Delete all shared files for everyone?")) fetch("/files?from="+encodeURIComponent(userName),{method:"DELETE"}).catch(()=>{});
-    } else {
-      if(confirm("Clear the chat for everyone?") && ws && ws.readyState===1) ws.send(JSON.stringify({type:"clearChat"}));
-    }
+    if(confirm("Delete all shared files for everyone?")) fetch("/files?from="+encodeURIComponent(userName),{method:"DELETE"}).catch(()=>{});
+  });
+  $("clearChatBtn").addEventListener("click",()=>{
+    if(confirm("Clear the chat for everyone?") && ws && ws.readyState===1) ws.send(JSON.stringify({type:"clearChat"}));
   });
 
   // ---- copy fingerprint ----
