@@ -61,8 +61,6 @@
   .topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border-radius: var(--r); padding: 7px 16px; }
   .brand { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-weight: 600; font-size: 16px; letter-spacing: -.01em; }
   .brand .prompt { color: var(--accent); }
-  .brand .ver { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin: 0 -3px 0 -4px; }
-  .brand .ver:empty { display: none; }
   .status-pill { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 100px; padding: 4px 11px; }
   .status-pill.down { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -348,7 +346,6 @@
     .app { padding: 12px 7px; gap: 12px; }
     .topbar { gap: 8px 6px; padding: 10px 12px; }
     .brand { font-size: 15px; }
-    .brand .ver { display: none; }
     .uptime { display: none; }
     /* topbar row 1: brand + status at left, theme + github at right; name and host URL each
        drop to their own full-width row below */
@@ -475,7 +472,7 @@
   </div>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="prompt">~/</span>servd<span class="ver" id="brandVer"></span></div>
+      <div class="brand"><span class="prompt">~/</span>servd</div>
       <span class="status-pill" id="statusPill"><span class="dot" id="dot"></span><span id="statusText">connecting...</span></span>
       <span class="uptime" id="uptime"></span>
       <span class="spacer"></span>
@@ -559,9 +556,9 @@
               <div class="row spread">
                 <div class="row">
                   <div class="seg" role="radiogroup" aria-label="What to stream">
+                    <button type="button" role="radio" data-live-kind="screen" aria-checked="false" id="kindScreen">screen</button>
                     <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
                     <button type="button" role="radio" data-live-kind="audio" aria-checked="false">microphone</button>
-                    <button type="button" role="radio" data-live-kind="screen" aria-checked="false" id="kindScreen">screen</button>
                   </div>
                   <label class="check" id="audioOnlyOpt" title="Only what this computer is playing (music, a video's sound), no picture" hidden><input type="checkbox" id="liveAudioOnly" /> audio only</label>
                 </div>
@@ -579,7 +576,6 @@
                 <button class="mini-btn btn-primary" id="playShared" type="button" disabled>play</button>
               </div>
               <div class="row">
-                <span class="sec-desc">Not shared yet?</span>
                 <button class="mini-btn" id="playUpload" type="button">choose a video or audio file…</button>
                 <input type="file" id="playInput" accept="video/*,audio/*" hidden />
               </div>
@@ -778,7 +774,7 @@
     fetch("/status").then(r=>r.json()).then(s => {
       $("hostUrl").textContent = location.protocol + "//" + s.address + ":" + s.port;
       hubAddr = s.address; renderConnect();
-      if(s.version){ $("brandVer").textContent = "v"+s.version; $("setVer").textContent = "v"+s.version; }
+      if(s.version) $("setVer").textContent = "v"+s.version;
       syncNameWidth();
       $("uptime").textContent = fmtUptime(s.uptimeMs);
       lastConnected = s.connected;
@@ -918,6 +914,7 @@
     return out;
   }
   function renderFiles(){
+    if(hostMode) refreshPlayPick(); // first: the empty case below returns early
     const groups=groupFiles();
     const ups=[...uploads.entries()];
     fbadge.style.display = groups.length ? "" : "none"; fbadge.textContent=groups.length;
@@ -981,7 +978,6 @@
     flist.querySelectorAll('button[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelUpload(b.dataset.cancel)));
     flist.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{ const f=files.get(b.dataset.open); if(f) openViewer(f); }));
     flist.querySelectorAll("[data-playall]").forEach(b=>b.addEventListener("click",()=>{ playForEveryone(b.dataset.playall); selectView("stream"); }));
-    if(hostMode) refreshPlayPick();
   }
   function updateUpRow(id){
     const u=uploads.get(id); if(!u) return;
@@ -1578,6 +1574,7 @@
     document.querySelectorAll("[data-live-kind]").forEach(x=>x.setAttribute("aria-checked", x===b));
     $("audioOnlyOpt").hidden = liveKind!=="screen"; // only a screen has a separate sound to send alone
   }));
+  ($("kindScreen").hidden ? document.querySelector('[data-live-kind="camera"]') : $("kindScreen")).click(); // start on the first option shown
 
   function renderLive(m){
     const prev=liveSeen;
@@ -1730,7 +1727,7 @@
     sel.innerHTML = media.length ? media.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.path||f.name)+'</option>').join("")
                                  : '<option value="">no shared video or audio yet</option>';
     if(media.some(f=>f.id===cur)) sel.value=cur;
-    $("playShared").disabled=!media.length;
+    sel.disabled = $("playShared").disabled = !media.length; // nothing to pick until a video or audio file is shared
   }
   // Where the host's player is right now: its last report, aged by how long ago the hub stamped it,
   // how long it took to reach us (half our round trip) and how long we've held it since.
