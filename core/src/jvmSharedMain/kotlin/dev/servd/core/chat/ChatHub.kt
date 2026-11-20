@@ -171,8 +171,9 @@ class ChatHub(private val serverName: String) {
     suspend fun onLiveWatch(id: String, streamId: String) {
         when (val r = liveLock.withLock { live.watch(streamId, id) }) {
             is LiveRegistry.Watch.Ok -> {
+                // Always tell the owner (a re-watch needs a fresh connection); the list only changes for a new viewer.
                 sendTo(r.ownerId, LiveViewer(streamId, id, joined = true, name = conns[id]?.name))
-                broadcastLive()
+                if (r.added) broadcastLive()
             }
             LiveRegistry.Watch.Full -> sendTo(id, LiveFull(streamId))
             LiveRegistry.Watch.Invalid -> {}

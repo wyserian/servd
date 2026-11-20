@@ -15,7 +15,8 @@ class LiveRegistry(private val newId: () -> String, val maxViewers: Int = MAX_VI
     private val byOwner = LinkedHashMap<String, Entry>() // start order
 
     sealed interface Watch {
-        data class Ok(val ownerId: String) : Watch
+        /** [added] is false when the viewer was already watching (a re-connect): the count didn't change. */
+        data class Ok(val ownerId: String, val added: Boolean = true) : Watch
         data object Full : Watch
         data object Invalid : Watch
     }
@@ -38,10 +39,9 @@ class LiveRegistry(private val newId: () -> String, val maxViewers: Int = MAX_VI
     fun watch(streamId: String, viewerId: String): Watch {
         val e = find(streamId) ?: return Watch.Invalid
         if (e.ownerId == viewerId) return Watch.Invalid
-        if (viewerId !in e.viewers) {
-            if (e.viewers.size >= maxViewers) return Watch.Full
-            e.viewers += viewerId
-        }
+        if (viewerId in e.viewers) return Watch.Ok(e.ownerId, added = false)
+        if (e.viewers.size >= maxViewers) return Watch.Full
+        e.viewers += viewerId
         return Watch.Ok(e.ownerId)
     }
 

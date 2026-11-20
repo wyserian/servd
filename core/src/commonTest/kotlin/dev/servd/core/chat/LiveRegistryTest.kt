@@ -38,7 +38,7 @@ class LiveRegistryTest {
         assertEquals(LiveRegistry.Watch.Ok("alice"), r.watch(id, "v1"))
         assertEquals(LiveRegistry.Watch.Ok("alice"), r.watch(id, "v2"))
         assertEquals(LiveRegistry.Watch.Full, r.watch(id, "v3"))
-        assertEquals(LiveRegistry.Watch.Ok("alice"), r.watch(id, "v1"), "already watching: no extra seat")
+        assertEquals(LiveRegistry.Watch.Ok("alice", added = false), r.watch(id, "v1"), "already watching: no extra seat")
         assertEquals("alice", r.leave(id, "v2"))
         assertEquals(LiveRegistry.Watch.Ok("alice"), r.watch(id, "v3"))
         assertEquals(2, r.snapshot { it }.single().viewers)
