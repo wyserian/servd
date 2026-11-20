@@ -88,14 +88,23 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
 
     val enabled: Boolean get() = server != null
 
-    /** Trust the target's cert unconditionally: it's the host's own server on the trusted LAN. */
-    private val client: HttpClient by lazy {
-        HttpClient(CIO) {
-            install(ClientWebSockets)
-            followRedirects = false // relay 3xx to the browser (with Location rewritten)
-            expectSuccess = false   // 4xx/5xx are normal responses to forward, not errors
-            engine {
-                https { trustManager = TrustAllCerts }
+    /** The client for the current target, made by [enable] (see [newClient]). */
+    @Volatile private var client: HttpClient? = null
+
+    /**
+     * Trust the target's cert unconditionally: it's the host's own server on the trusted LAN. The TLS
+     * server name is the target's own host ("localhost"), not the reverse-DNS name of the loopback IP
+     * actually dialled (with Docker Desktop, 127.0.0.1 resolves to kubernetes.docker.internal, which
+     * no dev cert lists), so `https://localhost` targets pass the client's hostname check.
+     */
+    private fun newClient(target: String) = HttpClient(CIO) {
+        install(ClientWebSockets)
+        followRedirects = false // relay 3xx to the browser (with Location rewritten)
+        expectSuccess = false   // 4xx/5xx are normal responses to forward, not errors
+        engine {
+            https {
+                trustManager = TrustAllCerts
+                serverName = runCatching { URI(target).host }.getOrNull()
             }
         }
     }
@@ -113,6 +122,7 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         val normalized = normalizeTarget(target)
         require(port in 1..65535) { "port out of range: $port" }
         disable()
+        client = newClient(normalized)
         val srv = embeddedServer(
             engineFactory,
             applicationEnvironment { },
@@ -138,6 +148,8 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
     fun disable() {
         server?.let { runCatching { it.stop(200, 800) } }
         server = null
+        client?.close()
+        client = null
         currentTarget = null
         currentPort = 0
         resolvedOrigin = null
@@ -182,6 +194,7 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         val url = upstreamOrigin(target) + call.request.uri
         val method = call.request.httpMethod
         val hasBody = method != HttpMethod.Get && method != HttpMethod.Head
+        val client = client ?: return // stopped mid-request
         val response = try {
             client.request(url) {
                 this.method = method
@@ -218,6 +231,7 @@ class WebProxy<TEngine : ApplicationEngine, TConfiguration : ApplicationEngine.C
         downstream: io.ktor.server.websocket.DefaultWebSocketServerSession,
     ) {
         val wsUrl = toWsScheme(upstreamOrigin(target)) + downstream.call.request.uri
+        val client = client ?: return // stopped mid-request
         try {
             client.clientWebSocket(wsUrl, request = { headers[HttpHeaders.Host] = targetAuthority(target) }) {
                 val upstream = this
