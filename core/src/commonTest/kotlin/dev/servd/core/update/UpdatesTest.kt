@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class UpdatesTest {
 
     private fun release(tag: String, vararg assets: String) = """
-        {"tag_name":"$tag","draft":false,"assets":[${assets.joinToString(",") {
+        {"tag_name":"$tag","html_url":"https://github.com/wyserian/servd/releases/tag/$tag","draft":false,"assets":[${assets.joinToString(",") {
             """{"name":"$it","size":123,"browser_download_url":"https://github.com/wyserian/servd/releases/download/$tag/$it"}"""
         }}]}
     """
@@ -30,6 +30,14 @@ class UpdatesTest {
         assertEquals("1.8.0", u?.version)
         assertEquals("https://github.com/wyserian/servd/releases/download/v1.8.0/servd-1.8.0-release.apk", u?.apkUrl)
         assertEquals(123, u?.size)
+    }
+
+    @Test
+    fun a_newer_release_gives_its_version_and_page_whatever_its_files() {
+        val r = Updates.newerRelease(release("v1.9.0", "servd-1.9.0-windows.zip"), "1.8.0")
+        assertEquals(NewRelease("1.9.0", "https://github.com/wyserian/servd/releases/tag/v1.9.0"), r)
+        assertNull(Updates.newerRelease(release("v1.8.0"), "1.8.0"), "same version")
+        assertNull(Updates.newerRelease("""{"tag_name":"v9.0.0"}""", "1.8.0"), "no page to link")
     }
 
     @Test

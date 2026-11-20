@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
 import dev.servd.core.tls.TrustAllCerts
+import dev.servd.core.update.Updates
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -64,6 +65,7 @@ fun main(args: Array<String>) {
     val adminToken = ServdCredentials.loadOrCreateAdminToken(dataDir)
 
     println("${Servd.NAME} v${Servd.VERSION} - ${Servd.TAGLINE}")
+    printUpdateWhenKnown()
     if (!portFree(bindHost, opts.port)) portInUse(opts.port, opts.noOpen, adminToken)
     if (opts.host == null && lan == null) {
         println("(no LAN address found - reachable at 127.0.0.1 only; connect Wi-Fi/hotspot for other devices)")
@@ -233,6 +235,22 @@ private fun usageError(message: String): Nothing {
     println(message)
     exitProcess(1)
 }
+
+/**
+ * Prints "update : vX.Y.Z is available" once GitHub's latest release answers. In the background
+ * with short timeouts, so start-up never waits on it; offline, it prints nothing.
+ */
+private fun printUpdateWhenKnown() = Thread {
+    runCatching {
+        val conn = URI(Updates.LATEST_URL).toURL().openConnection() as HttpsURLConnection
+        conn.connectTimeout = 3000
+        conn.readTimeout = 3000
+        conn.setRequestProperty("Accept", "application/vnd.github+json")
+        conn.setRequestProperty("User-Agent", "servd/${Servd.VERSION}")
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        Updates.newerRelease(body, Servd.VERSION)?.let { println("update  : v${it.version} is available - ${it.pageUrl}") }
+    }
+}.apply { isDaemon = true }.start()
 
 /** The host's dashboard link: loopback plus the admin token (the hub swaps it for a cookie). */
 private fun adminUrl(port: Int, adminToken: String) = "https://127.0.0.1:$port/?admin=$adminToken"

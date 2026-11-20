@@ -66,6 +66,9 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
   .dot.live { animation: pulse 2s ease-in-out infinite; }
   .status-pill.down .dot { background: var(--warn); box-shadow: none; animation: none; }
+  .update-pill { display: inline-flex; align-items: center; height: 32px; padding: 0 11px; border-radius: 100px; font-family: var(--mono); font-size: 11px; font-weight: 700; color: #04150F; background: var(--accent); text-decoration: none; white-space: nowrap; }
+  .update-pill:hover { filter: brightness(1.07); }
+  .update-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent); } }
   .uptime { font-family: var(--mono); font-size: 12px; color: var(--muted); }
   .spacer { flex: 1 1 auto; }
@@ -350,7 +353,7 @@
     /* topbar row 1: brand + status at left, theme + github at right; name and host URL each
        drop to their own full-width row below */
     .brand { order: 1; }
-    .status-pill { order: 2; }
+    .status-pill, .update-pill { order: 2; }
     .spacer { order: 3; }
     .topbar .icon-btn { order: 4; }
     .namebox { order: 6; flex: 1 1 100%; width: auto; }
@@ -474,6 +477,7 @@
     <header class="topbar">
       <div class="brand"><span class="prompt">~/</span>servd</div>
       <span class="status-pill" id="statusPill"><span class="dot" id="dot"></span><span id="statusText">connecting...</span></span>
+      <a class="update-pill" id="updatePill" target="_blank" rel="noopener noreferrer" title="Open the release page" hidden></a>
       <span class="uptime" id="uptime"></span>
       <span class="spacer"></span>
       <span class="namebox"><input id="name" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Your display name" /><span class="you-suffix" aria-hidden="true">you</span></span>
@@ -770,11 +774,37 @@
   }
   window.addEventListener("resize", syncNameWidth);
 
+  // ---- update available (host only: only the host can update the hub) ----
+  // GitHub's latest release, asked from this browser at most once a day; the hub itself stays offline.
+  let newRelease=null, updateChecked=false;
+  function isNewer(a, b){ // plain x.y.z, like the hub's Updates.isNewer; "1.9.0-rc1" never counts
+    const p=v=>{ const x=String(v).split(".").map(Number); return x.length===3 && x.every(Number.isInteger) ? x : null; };
+    const x=p(a), y=p(b); if(!x || !y) return false;
+    for(let i=0;i<3;i++) if(x[i]!==y[i]) return x[i]>y[i];
+    return false;
+  }
+  function checkUpdate(current){
+    if(updateChecked) return; updateChecked=true;
+    const show=r=>{
+      if(!r || !isNewer(r.v, current) || !/^https:\/\//.test(r.url)) return;
+      newRelease=r;
+      const pill=$("updatePill"); pill.textContent="v"+r.v+" available"; pill.href=r.url; pill.hidden=false;
+      $("setVer").textContent="v"+current+" · update available";
+    };
+    let cached=null; try{ cached=JSON.parse(localStorage.getItem("servd-release")); }catch{}
+    if(cached && Date.now()-cached.at < 864e5) return show(cached);
+    fetch("https://api.github.com/repos/wyserian/servd/releases/latest", {headers:{Accept:"application/vnd.github+json"}})
+      .then(r=>r.ok ? r.json() : null)
+      .then(j=>{ if(!j) return; const r={v:String(j.tag_name||"").replace(/^v/,""), url:String(j.html_url||""), at:Date.now()};
+        try{ localStorage.setItem("servd-release", JSON.stringify(r)); }catch{} show(r); })
+      .catch(()=>{}); // offline or no public release: nothing to show
+  }
   function loadStatus(){
     fetch("/status").then(r=>r.json()).then(s => {
       $("hostUrl").textContent = location.protocol + "//" + s.address + ":" + s.port;
       hubAddr = s.address; renderConnect();
-      if(s.version) $("setVer").textContent = "v"+s.version;
+      if(s.version) $("setVer").textContent = "v"+s.version+(newRelease ? " · update available" : "");
+      if(hostMode && s.version) checkUpdate(s.version);
       syncNameWidth();
       $("uptime").textContent = fmtUptime(s.uptimeMs);
       lastConnected = s.connected;

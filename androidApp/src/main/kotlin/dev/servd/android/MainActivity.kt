@@ -51,6 +51,8 @@ class MainActivity : Activity() {
     private lateinit var openButton: Button
     private lateinit var copyButton: Button
     private lateinit var storageButton: Button
+    private lateinit var updateBanner: LinearLayout
+    private lateinit var updateText: TextView
     private lateinit var updateButton: Button
     private var update: Update? = null
     private var updating = false
@@ -72,8 +74,8 @@ class MainActivity : Activity() {
             val found = Updater.check(applicationContext) ?: return@Thread
             runOnUiThread {
                 update = found
-                updateButton.text = "Update to v${found.version}"
-                updateButton.visibility = View.VISIBLE
+                updateText.text = "Update available: v${found.version}"
+                updateBanner.visibility = View.VISIBLE
             }
         }.start()
     }
@@ -105,17 +107,17 @@ class MainActivity : Activity() {
     private fun download(u: Update) {
         updating = true
         updateButton.isEnabled = false
-        updateButton.text = "Downloading v${u.version}..."
+        updateButton.text = "0%"
         Thread {
             val result = runCatching {
                 Updater.install(applicationContext, u) { pct ->
-                    runOnUiThread { updateButton.text = "Downloading v${u.version}... $pct%" }
+                    runOnUiThread { updateButton.text = "$pct%" }
                 }
             }
             runOnUiThread {
                 updating = false
                 updateButton.isEnabled = true
-                updateButton.text = "Update to v${u.version}"
+                updateButton.text = "Update"
                 result.onFailure { Toast.makeText(this, "Update failed: ${it.message}", Toast.LENGTH_LONG).show() }
             }
         }.start()
@@ -144,6 +146,31 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#E9EEEF"))
             setPadding(pad, pad, pad, pad)
         }
+
+        // "Update available" banner, first thing on the screen once the daily check finds a newer release.
+        updateText = TextView(this).apply {
+            setTextColor(accent)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        updateButton = button("Update", accent, Color.WHITE) { startUpdate() }.apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            setPadding(dp(16), 0, dp(16), 0)
+        }
+        updateBanner = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(Color.parseColor("#D6EFEA"), dp(12))
+            setPadding(dp(16), dp(10), dp(10), dp(10))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(14) }
+            addView(updateText)
+            addView(updateButton)
+            visibility = View.GONE
+        }
+        root.addView(updateBanner)
 
         root.addView(TextView(this).apply {
             text = Servd.TAGLINE.replaceFirstChar { it.uppercase() }
@@ -199,9 +226,6 @@ class MainActivity : Activity() {
         details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         card.addView(details)
         root.addView(card)
-
-        updateButton = button("Update", Color.WHITE, accent) { startUpdate() }.apply { visibility = View.GONE }
-        root.addView(updateButton)
 
         root.addView(TextView(this).apply {
             text = "v${Servd.VERSION}"
