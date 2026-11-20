@@ -557,11 +557,13 @@
               <div class="sec-head"><h3 id="goLiveH">Go live</h3><span class="sec-meta">up to <span id="liveMax">10</span> viewers</span></div>
               <p class="sec-desc">Video and sound go straight from this device to each viewer over the network.</p>
               <div class="row spread">
-                <div class="seg" role="radiogroup" aria-label="What to stream">
-                  <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
-                  <button type="button" role="radio" data-live-kind="audio" aria-checked="false">microphone</button>
-                  <button type="button" role="radio" data-live-kind="screen" aria-checked="false" id="kindScreen">screen</button>
-                  <button type="button" role="radio" data-live-kind="sound" aria-checked="false" id="kindSound" title="What this computer is playing: music, a video's sound">computer sound</button>
+                <div class="row">
+                  <div class="seg" role="radiogroup" aria-label="What to stream">
+                    <button type="button" role="radio" data-live-kind="camera" aria-checked="true">camera</button>
+                    <button type="button" role="radio" data-live-kind="audio" aria-checked="false">microphone</button>
+                    <button type="button" role="radio" data-live-kind="screen" aria-checked="false" id="kindScreen">screen</button>
+                  </div>
+                  <label class="check" id="audioOnlyOpt" title="Only what this computer is playing (music, a video's sound), no picture" hidden><input type="checkbox" id="liveAudioOnly" /> audio only</label>
                 </div>
                 <button class="mini-btn btn-primary" id="goLive" type="button">go live</button>
               </div>
@@ -1548,10 +1550,12 @@
   // WebRTC peer to peer: the streamer sends media straight to each viewer over the LAN; the hub
   // only keeps the list of who is live and relays the setup messages (SDP, ICE) between the two.
   const RTC_CFG={iceServers:[]}; // LAN only: no STUN/TURN servers, so it works fully offline
-  const KIND_LABEL={camera:"camera", audio:"microphone", screen:"screen", sound:"computer sound"};
+  const KIND_LABEL={camera:"camera", audio:"microphone", screen:"screen", sound:"screen audio"};
   const audioOnly = kind => kind==="audio" || kind==="sound";
-  // Music, not speech: no voice processing, and Opus in stereo at up to 128 kbps (WebRTC's default is ~32 kbps mono).
+  // A screen's sound is music, not speech: no voice processing, and Opus in stereo at up to 128 kbps
+  // (WebRTC's default is ~32 kbps mono). "sound" is a screen shared as audio only.
   const MUSIC_AUDIO={echoCancellation:false, noiseSuppression:false, autoGainControl:false};
+  const musicKind = kind => kind==="screen" || kind==="sound";
   function musicSdp(desc){
     const pt=(desc.sdp.match(/a=rtpmap:(\d+) opus\/48000/i)||[])[1];
     if(!pt) return desc;
@@ -1568,10 +1572,11 @@
   // Go live is host-only; a guest who isn't watching gets a hint instead of an empty column.
   function syncLiveUi(){ $("goLiveBox").hidden = !hostMode || !!myStream; $("playBox").hidden = !hostMode; $("liveIdle").hidden = hostMode || !!watch || !!np; }
 
-  if(!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) $("kindScreen").hidden=$("kindSound").hidden=true; // phones can't share their screen (or its sound)
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) $("kindScreen").hidden=true; // phones can't share their screen
   document.querySelectorAll("[data-live-kind]").forEach(b=>b.addEventListener("click",()=>{
     liveKind=b.dataset.liveKind;
     document.querySelectorAll("[data-live-kind]").forEach(x=>x.setAttribute("aria-checked", x===b));
+    $("audioOnlyOpt").hidden = liveKind!=="screen"; // only a screen has a separate sound to send alone
   }));
 
   function renderLive(m){
@@ -1608,19 +1613,21 @@
 
   // As streamer
   async function goLive(){
-    liveErr(""); const kind=liveKind, md=navigator.mediaDevices;
+    const kind = liveKind==="screen" && $("liveAudioOnly").checked ? "sound" : liveKind, md=navigator.mediaDevices;
+    liveErr("");
     if(!md){ liveErr("This browser can't stream from here."); return; }
     try{
-      if(kind==="sound"){
-        // A page can only reach the speaker output through the screen-share picker: keep its sound, drop the picture.
+      if(musicKind(kind)){
+        // A screen, with what this computer is playing (the only way a page can reach the speaker output).
         const cap=await md.getDisplayMedia({video:true, audio:{...MUSIC_AUDIO, suppressLocalAudioPlayback:false}, systemAudio:"include"});
-        const sound=cap.getAudioTracks();
-        cap.getVideoTracks().forEach(t=>t.stop());
-        if(!sound.length){ liveErr("No sound was shared. In the picker, tick “Share system audio” (whole screen) or “Share tab audio” (a tab), then try again."); return; }
-        myStream=new MediaStream(sound);
+        if(kind==="sound"){ // audio only: keep the sound, drop the picture
+          const sound=cap.getAudioTracks();
+          cap.getVideoTracks().forEach(t=>t.stop());
+          if(!sound.length){ liveErr("No sound was shared. In the picker, tick “Share system audio” (whole screen) or “Share tab audio” (a tab), then try again."); return; }
+          myStream=new MediaStream(sound);
+        } else myStream=cap;
       } else {
-        myStream = kind==="screen" ? await md.getDisplayMedia({video:true, audio:true})
-                                   : await md.getUserMedia(kind==="audio" ? {audio:true} : {video:true, audio:true});
+        myStream = await md.getUserMedia(kind==="audio" ? {audio:true} : {video:true, audio:true});
       }
     }catch(e){
       liveErr(e && e.name==="NotAllowedError" ? "Permission was denied. Allow the "+KIND_LABEL[kind]+" in the browser, then try again." : "Couldn't start the "+KIND_LABEL[kind]+".");
@@ -1653,7 +1660,7 @@
     myStream.getTracks().forEach(t=>pc.addTrack(t, myStream));
     pc.onicecandidate=e=>{ if(e.candidate) wsSend({type:"signal", to:m.viewerId, stream:m.stream, data:{ice:e.candidate}}); };
     const offer=await pc.createOffer();
-    await pc.setLocalDescription(myKind==="sound" ? musicSdp(offer) : offer);
+    await pc.setLocalDescription(musicKind(myKind) ? musicSdp(offer) : offer);
     wsSend({type:"signal", to:m.viewerId, stream:m.stream, data:{sdp:pc.localDescription}});
   }
   // Each viewer costs the streamer one upload, so keep video at a LAN-friendly rate.
@@ -1698,7 +1705,7 @@
     if(watch && m.from===watch.s.ownerId && m.stream===watch.s.id){
       const pc=watch.pc, kind=watch.s.kind;
       // The answer's stereo/bitrate settings are what tell the streamer's encoder to send music quality.
-      if(d.sdp){ await pc.setRemoteDescription(d.sdp); const ans=await pc.createAnswer(); await pc.setLocalDescription(kind==="sound" ? musicSdp(ans) : ans);
+      if(d.sdp){ await pc.setRemoteDescription(d.sdp); const ans=await pc.createAnswer(); await pc.setLocalDescription(musicKind(kind) ? musicSdp(ans) : ans);
                  wsSend({type:"signal", to:m.from, stream:m.stream, data:{sdp:pc.localDescription}}); }
       else if(d.ice) await pc.addIceCandidate(d.ice);
       return;

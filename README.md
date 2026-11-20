@@ -46,7 +46,8 @@ configure the host appear only on the host itself.
   shared files after 1 hour, 24 hours or 7 days.
 - **Chat:** real-time chat over WSS, with a live list of who's connected.
 - **Live streams:** the host goes live with their camera, microphone or (in desktop browsers) screen,
-  and up to 10 devices watch. Media goes peer to peer over the LAN with WebRTC, so the hub isn't
+  and up to 10 devices watch. A screen carries what the computer is playing, in music quality;
+  tick **audio only** to send just that sound. Media goes peer to peer over the LAN with WebRTC, so the hub isn't
   loaded.
 - **Watch together:** the host plays a shared video or audio file, a YouTube video or an https
   media link for everyone. With sync on, the host's play, pause and seek apply on every device.
